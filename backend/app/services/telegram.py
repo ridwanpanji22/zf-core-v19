@@ -1,6 +1,6 @@
 import httpx
 import structlog
-from redis import Redis
+from redis.asyncio import Redis
 from app.config import settings
 
 logger = structlog.get_logger()
@@ -44,27 +44,28 @@ class TelegramAlertSystem:
         # 1. Anti-Spam Filter check: block duplicate alerts within 15 minutes (900s)
         if symbol:
             spam_key = f"alert_sent:{alert_type}:{symbol}"
-            if self.redis_client.get(spam_key) == "true":
+            is_sent = await self.redis_client.get(spam_key)
+            if is_sent == "true":
                 logger.info("Alert throttled (duplicate filter)", symbol=symbol, alert_type=alert_type)
                 return False
             # Set lock for 15 minutes
-            self.redis_client.set(spam_key, "true", ex=900)
+            await self.redis_client.set(spam_key, "true", ex=900)
 
         # 2. Rate-Limiting check: Max 5 alerts per minute globally
         rate_key = "alert_global_counter"
-        current_rate = self.redis_client.get(rate_key)
+        current_rate = await self.redis_client.get(rate_key)
         if current_rate and int(current_rate) >= 5:
             # We delay or hold and combine. For MVP we log rate-limit limit and drop
             logger.warn("Alert throttled (global rate limit hit, >5/min)")
             # Add message to pending alerts list to combine
-            self.redis_client.lpush("alert_pending_queue", f"[{priority.upper()}] {message}")
+            await self.redis_client.lpush("alert_pending_queue", f"[{priority.upper()}] {message}")
             return False
 
         # Increment counter
         if not current_rate:
-            self.redis_client.set(rate_key, "1", ex=60)
+            await self.redis_client.set(rate_key, "1", ex=60)
         else:
-            self.redis_client.incr(rate_key)
+            await self.redis_client.incr(rate_key)
 
         # 3. Format templates based on priority
         emoji = "🟢 [INFO]"
@@ -79,14 +80,14 @@ class TelegramAlertSystem:
 
     async def check_and_send_pending_summary(self):
         """Process and send queued pending alerts as 1 combined summary message."""
-        queue_len = self.redis_client.llen("alert_pending_queue")
+        queue_len = await self.redis_client.llen("alert_pending_queue")
         if queue_len == 0:
             return
 
         # Fetch all pending messages
         alerts = []
-        while self.redis_client.llen("alert_pending_queue") > 0:
-            item = self.redis_client.rpop("alert_pending_queue")
+        while await self.redis_client.llen("alert_pending_queue") > 0:
+            item = await self.redis_client.rpop("alert_pending_queue")
             if item:
                 alerts.append(item)
 
@@ -97,3 +98,7 @@ class TelegramAlertSystem:
         combined_text += "\n".join(f"- {a}" for a in alerts)
 
         await self.send_message(combined_text)
+
+    async def close(self):
+        """Close connection to Redis client."""
+        await self.redis_client.close()
