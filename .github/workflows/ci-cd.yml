@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-size: '3.12'
+          python-version: '3.12'
 
       - name: Install Python Dependencies
         run: |
@@ -62,6 +62,17 @@ jobs:
         run: |
           cd backend
           pytest
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Frontend Dependencies & Run Tests
+        run: |
+          cd frontend
+          npm ci
+          npm run test -- --passWithNoTests # Allow pass if no tests configured yet
 
   build:
     needs: test
@@ -116,8 +127,16 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
 
-      - name: Send Telegram Notification
+      - name: Send Telegram Notification (Success)
+        if: success()
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text="✅ Deploy Berhasil! ZF-Core V19.0 telah dideploy ke VPS pada branch ${{ github.ref_name }}."
+
+      - name: Send Telegram Notification (Failure)
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="🚨 Deploy Gagal! Deteksi error pada proses build/deploy pipeline ZF-Core V19.0 branch ${{ github.ref_name }}."
