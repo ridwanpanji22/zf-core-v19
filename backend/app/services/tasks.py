@@ -15,7 +15,7 @@ from app.core.psi_total import calculate_psi_total
 from app.core.decay import predict_decay
 from app.core.calibration import recalibrate_omega as recalib_omg
 from app.core.asset_swarm import AssetSwarmManager
-from app.services import mbs
+from app.services import mbs, demo as demo_service
 
 logger = structlog.get_logger()
 redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
