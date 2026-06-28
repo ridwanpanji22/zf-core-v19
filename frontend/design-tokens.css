@@ -1,0 +1,173 @@
+:root {
+  --meta-version: 1.0.0;
+  --meta-style: modern;
+  --meta-generated: custom-trading-dark;
+
+  /* Colors - Primary (Neon Emerald) */
+  --colors-primary-50: #E6FFF3;
+  --colors-primary-100: #B3FFD6;
+  --colors-primary-200: #80FFB9;
+  --colors-primary-300: #4DFF9C;
+  --colors-primary-400: #1AFF80;
+  --colors-primary-500: #00FF88;
+  --colors-primary-600: #00CC6D;
+  --colors-primary-700: #009952;
+  --colors-primary-800: #006636;
+  --colors-primary-900: #00331B;
+  --colors-primary-DEFAULT: #00FF88;
+
+  /* Colors - Secondary (Cyan) */
+  --colors-secondary-50: #E6FCFF;
+  --colors-secondary-100: #B3F7FF;
+  --colors-secondary-200: #80F1FF;
+  --colors-secondary-300: #4DEBFF;
+  --colors-secondary-400: #1AE6FF;
+  --colors-secondary-500: #00E5FF;
+  --colors-secondary-600: #00B7CC;
+  --colors-secondary-700: #008999;
+  --colors-secondary-800: #005B66;
+  --colors-secondary-900: #002E33;
+  --colors-secondary-DEFAULT: #00E5FF;
+
+  /* Colors - Neutral (Slate dark scheme) */
+  --colors-neutral-50: #F8FAFC;
+  --colors-neutral-100: #F1F5F9;
+  --colors-neutral-200: #E2E8F0;
+  --colors-neutral-300: #CBD5E1;
+  --colors-neutral-400: #94A3B8;
+  --colors-neutral-500: #64748B;
+  --colors-neutral-600: #475569;
+  --colors-neutral-700: #334155;
+  --colors-neutral-800: #1E293B;
+  --colors-neutral-900: #0F172A;
+  --colors-neutral-950: #020617;
+  --colors-neutral-DEFAULT: #64748B;
+
+  /* Semantic */
+  --colors-semantic-success-base: #10B981;
+  --colors-semantic-success-light: #34D399;
+  --colors-semantic-success-dark: #059669;
+  --colors-semantic-success-contrast: #FFFFFF;
+  --colors-semantic-warning-base: #F59E0B;
+  --colors-semantic-warning-light: #FBBD24;
+  --colors-semantic-warning-dark: #D97706;
+  --colors-semantic-warning-contrast: #FFFFFF;
+  --colors-semantic-error-base: #EF4444;
+  --colors-semantic-error-light: #F87171;
+  --colors-semantic-error-dark: #DC2626;
+  --colors-semantic-error-contrast: #FFFFFF;
+  --colors-semantic-info-base: #3B82F6;
+  --colors-semantic-info-light: #60A5FA;
+  --colors-semantic-info-dark: #2563EB;
+  --colors-semantic-info-contrast: #FFFFFF;
+
+  /* Surface */
+  --colors-surface-background: #020617;
+  --colors-surface-foreground: #F8FAFC;
+  --colors-surface-card: #0F172A;
+  --colors-surface-card-border: #1E293B;
+  --colors-surface-overlay: rgba(0, 0, 0, 0.75);
+  --colors-surface-divider: #1E293B;
+
+  /* Typography */
+  --typography-fontFamily-sans: Inter, system-ui, -apple-system, sans-serif;
+  --typography-fontFamily-serif: Merriweather, Georgia, serif;
+  --typography-fontFamily-mono: Fira Code, Monaco, monospace;
+
+  --typography-fontSize-xs: 12px;
+  --typography-fontSize-sm: 14px;
+  --typography-fontSize-base: 16px;
+  --typography-fontSize-lg: 18px;
+  --typography-fontSize-xl: 20px;
+  --typography-fontSize-2xl: 24px;
+  --typography-fontSize-3xl: 30px;
+  --typography-fontSize-4xl: 36px;
+  --typography-fontSize-5xl: 48px;
+
+  --typography-fontWeight-thin: 100;
+  --typography-fontWeight-light: 300;
+  --typography-fontWeight-normal: 400;
+  --typography-fontWeight-medium: 500;
+  --typography-fontWeight-semibold: 600;
+  --typography-fontWeight-bold: 700;
+  --typography-fontWeight-extrabold: 800;
+  --typography-fontWeight-black: 900;
+
+  --typography-lineHeight-none: 1;
+  --typography-lineHeight-tight: 1.25;
+  --typography-lineHeight-snug: 1.375;
+  --typography-lineHeight-normal: 1.5;
+  --typography-lineHeight-relaxed: 1.625;
+  --typography-lineHeight-loose: 2;
+
+  --typography-letterSpacing-tighter: -0.05em;
+  --typography-letterSpacing-tight: -0.025em;
+  --typography-letterSpacing-normal: 0;
+  --typography-letterSpacing-wide: 0.025em;
+  --typography-letterSpacing-wider: 0.05em;
+  --typography-letterSpacing-widest: 0.1em;
+
+  /* Spacing */
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* Borders */
+  --borders-radius-none: 0;
+  --borders-radius-sm: 4px;
+  --borders-radius-DEFAULT: 8px;
+  --borders-radius-md: 12px;
+  --borders-radius-lg: 16px;
+  --borders-radius-xl: 24px;
+  --borders-radius-full: 9999px;
+
+  --borders-width-none: 0;
+  --borders-width-thin: 1px;
+  --borders-width-DEFAULT: 1px;
+  --borders-width-medium: 2px;
+  --borders-width-thick: 4px;
+
+  /* Shadows */
+  --shadows-none: none;
+  --shadows-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadows-DEFAULT: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadows-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadows-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadows-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadows-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  --shadows-glow: 0 0 8px rgba(0, 255, 136, 0.5);
+
+  /* Breakpoints */
+  --breakpoints-xs: 480px;
+  --breakpoints-sm: 640px;
+  --breakpoints-md: 768px;
+  --breakpoints-lg: 1024px;
+  --breakpoints-xl: 1280px;
+  --breakpoints-2xl: 1536px;
+
+  /* Z-Index */
+  --z-index-hide: -1;
+  --z-index-base: 0;
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-overlay: 1030;
+  --z-index-modal: 1040;
+  --z-index-popover: 1050;
+  --z-index-tooltip: 1060;
+  --z-index-notification: 1070;
+}
