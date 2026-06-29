@@ -1,5 +1,6 @@
+import asyncio
 import ccxt
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -8,8 +9,10 @@ from app.api.deps import get_current_user
 from app.models.api_key import UserApiKey
 from app.services.crypto import encrypt, decrypt
 from pydantic import BaseModel, Field
+import structlog
 
 router = APIRouter()
+logger = structlog.get_logger()
 
 class ApiKeyCreate(BaseModel):
     api_key: str = Field(..., min_length=1)
@@ -19,7 +22,6 @@ class ApiKeyCreate(BaseModel):
 
 async def test_okx_connection(api_key: str, secret_key: str, passphrase: str) -> str:
     """Test connection credentials against OKX and return permission level."""
-    # Use ccxt standard exchange client
     exchange = ccxt.okx({
         "apiKey": api_key,
         "secret": secret_key,
@@ -27,21 +29,24 @@ async def test_okx_connection(api_key: str, secret_key: str, passphrase: str) ->
         "enableRateLimit": True
     })
     try:
-        # Fetch balance to test API key validation
-        balance = await asyncio.to_thread(exchange.fetch_balance)
-        # Check permission details from raw info or assume trade permission if fetch_balance works
-        # Default fallback permission level
+        await asyncio.to_thread(exchange.fetch_balance)
         return "trade"
+    except ccxt.AuthenticationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"OKX API Validation Failed: Invalid credentials"
+        )
+    except ccxt.NetworkError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OKX API unreachable — please retry later"
+        )
     except Exception as e:
-        # Standardize exchange exception message
-        err_msg = str(e)
-        if "API Key" in err_msg or "Invalid" in err_msg or "Signature" in err_msg:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"OKX API Validation Failed: {err_msg}"
-            )
-        # Return fallback trade if connection timeout/rate limit error
-        return "trade"
+        logger.error("OKX connection test failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OKX API validation failed"
+        )
 
 @router.post("")
 async def create_api_key(
@@ -50,7 +55,6 @@ async def create_api_key(
     db: AsyncSession = Depends(get_db)
 ):
     """Register and save user OKX API key encrypted (Max 3 keys per user)."""
-    # 1. Enforce max 3 keys constraint
     res = await db.execute(
         select(func.count(UserApiKey.id)).where(UserApiKey.user_id == current_user.id)
     )
@@ -60,37 +64,34 @@ async def create_api_key(
             detail="User cannot exceed limit of 3 API keys"
         )
 
-    # 2. Test credentials connection
-    import asyncio
     permission_level = await test_okx_connection(payload.api_key, payload.secret_key, payload.passphrase)
 
-    # 3. Encrypt credentials using AES-256-GCM
-    api_enc, nonce = encrypt(payload.api_key)
-    secret_enc, _ = encrypt(payload.secret_key)
-    passphrase_enc, _ = encrypt(payload.passphrase)
+    # Each field gets its own nonce — AES-GCM REQUIRES unique nonce per encryption
+    api_enc, api_nonce = encrypt(payload.api_key)
+    secret_enc, secret_nonce = encrypt(payload.secret_key)
+    passphrase_enc, passphrase_nonce = encrypt(payload.passphrase)
 
-    # Mask representations last4
     last4 = payload.api_key[-4:] if len(payload.api_key) >= 4 else payload.api_key
 
-    # Save to db
     key_entry = UserApiKey(
         user_id=current_user.id,
         label=payload.label,
         api_key_encrypted=api_enc,
         secret_key_encrypted=secret_enc,
         passphrase_encrypted=passphrase_enc,
-        nonce=nonce,
+        api_key_nonce=api_nonce,
+        secret_key_nonce=secret_nonce,
+        passphrase_nonce=passphrase_nonce,
         api_key_last4=last4,
         permission_level=permission_level,
         is_valid=True,
-        last_tested_at=datetime.utcnow()
+        last_tested_at=datetime.now(timezone.utc)
     )
 
     db.add(key_entry)
     await db.commit()
     await db.refresh(key_entry)
 
-    # Enforce withdraw permission safety warnings
     warning = None
     if permission_level == "withdraw":
         warning = "WARNING: API key has withdraw permissions. It is strongly recommended to restrict permissions to 'read' or 'trade' only on OKX dashboard."
@@ -107,7 +108,7 @@ async def create_api_key(
             "warning": warning
         },
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.get("")
@@ -133,7 +134,7 @@ async def list_api_keys(
         "success": True,
         "data": data,
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.delete("/{id}")
@@ -159,7 +160,7 @@ async def delete_api_key(
         "success": True,
         "data": {"status": "deleted"},
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.post("/{id}/test")
@@ -179,15 +180,14 @@ async def test_existing_key(
         raise HTTPException(status_code=404, detail="API key not found")
 
     try:
-        # Decrypt values using AES-256-GCM
-        api_key = decrypt(key.api_key_encrypted, key.nonce)
-        secret_key = decrypt(key.secret_key_encrypted, key.nonce)
-        passphrase = decrypt(key.passphrase_encrypted, key.nonce)
+        api_key = decrypt(key.api_key_encrypted, key.api_key_nonce)
+        secret_key = decrypt(key.secret_key_encrypted, key.secret_key_nonce)
+        passphrase = decrypt(key.passphrase_encrypted, key.passphrase_nonce)
 
         permission_level = await test_okx_connection(api_key, secret_key, passphrase)
         key.is_valid = True
         key.permission_level = permission_level
-        key.last_tested_at = datetime.utcnow()
+        key.last_tested_at = datetime.now(timezone.utc)
         await db.commit()
 
         return {
@@ -197,19 +197,25 @@ async def test_existing_key(
                 "permission_level": permission_level
             },
             "error": None,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }
-    except Exception as e:
+    except HTTPException:
         key.is_valid = False
-        key.last_tested_at = datetime.utcnow()
+        key.last_tested_at = datetime.now(timezone.utc)
         await db.commit()
+        raise
+    except Exception:
+        key.is_valid = False
+        key.last_tested_at = datetime.now(timezone.utc)
+        await db.commit()
+        logger.error("API key test failed", key_id=id)
 
         return {
             "success": True,
             "data": {
                 "is_valid": False,
-                "error": str(e)
+                "error": "API key validation failed"
             },
             "error": None,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }

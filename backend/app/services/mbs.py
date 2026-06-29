@@ -1,11 +1,11 @@
 import json
 import structlog
-from datetime import datetime
-from sqlalchemy import select, desc
+from datetime import datetime, timezone
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.asset import AssetSnapshot, AssetRegistry
-from app.models.session import SessionJournal
-from app.models.prediction import CalibrationLog
+from app.models.session import SessionJournal, SystemEvent
+from app.models.prediction import CalibrationLog, PredictionLog
 
 logger = structlog.get_logger()
 
@@ -100,43 +100,39 @@ async def create_journal(db_session: AsyncSession, started_at: datetime, ended_a
         raise
 
 async def load_and_merge(db_session: AsyncSession) -> list[dict]:
-    """Retrieve the latest snapshots and check for discrepancies."""
+    """Retrieve the latest snapshot per symbol in a single query (no N+1)."""
     try:
         logger.info("Loading and merging previous session state")
 
-        # Get active registry symbols
-        reg_result = await db_session.execute(
-            select(AssetRegistry.symbol).where(AssetRegistry.is_active == True)
+        # Single query: latest snapshot per active symbol using DISTINCT ON
+        from sqlalchemy import text
+        stmt = (
+            select(AssetSnapshot)
+            .join(AssetRegistry, AssetRegistry.symbol == AssetSnapshot.symbol)
+            .where(AssetRegistry.is_active == True)
+            .order_by(AssetSnapshot.symbol, desc(AssetSnapshot.time))
+            .distinct(AssetSnapshot.symbol)
         )
-        symbols = [r[0] for r in reg_result.all()]
+        result = await db_session.execute(stmt)
+        snapshots = result.scalars().all()
 
         merged_data = []
-
-        for symbol in symbols:
-            # Get latest snapshot for each symbol
-            snap_res = await db_session.execute(
-                select(AssetSnapshot)
-                .where(AssetSnapshot.symbol == symbol)
-                .order_by(desc(AssetSnapshot.time))
-                .limit(1)
-            )
-            snapshot = snap_res.scalar_one_or_none()
-            if snapshot:
-                merged_data.append({
-                    "symbol": snapshot.symbol,
-                    "price": float(snapshot.price),
-                    "zf_score": snapshot.zf_score,
-                    "psi_total": snapshot.psi_total,
-                    "d_res": snapshot.d_res,
-                    "oi": float(snapshot.oi) if snapshot.oi else None,
-                    "funding_rate": snapshot.funding_rate,
-                    "volume_24h": float(snapshot.volume_24h) if snapshot.volume_24h else None,
-                    "bid_depth_ratio": snapshot.bid_depth_ratio,
-                    "ofi": snapshot.ofi,
-                    "mode": snapshot.mode,
-                    "status": snapshot.status,
-                    "predicted_change_pct": snapshot.predicted_change_pct
-                })
+        for snapshot in snapshots:
+            merged_data.append({
+                "symbol": snapshot.symbol,
+                "price": float(snapshot.price),
+                "zf_score": snapshot.zf_score,
+                "psi_total": snapshot.psi_total,
+                "d_res": snapshot.d_res,
+                "oi": float(snapshot.oi) if snapshot.oi else None,
+                "funding_rate": snapshot.funding_rate,
+                "volume_24h": float(snapshot.volume_24h) if snapshot.volume_24h else None,
+                "bid_depth_ratio": snapshot.bid_depth_ratio,
+                "ofi": snapshot.ofi,
+                "mode": snapshot.mode,
+                "status": snapshot.status,
+                "predicted_change_pct": snapshot.predicted_change_pct
+            })
 
         logger.info("Previous session state loaded", count=len(merged_data))
         return merged_data

@@ -151,14 +151,14 @@ export default function SettingsPage() {
         <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-6 space-y-4">
           <h2 className="text-base font-bold text-white">API Key Terdaftar ({keys.length}/3)</h2>
           {keys.length === 0 ? (
-            <p className="text-sm text-slate-500">Belum ada API Key terdaftar. Sistem berjalan di mode read-only.</p>
+            <p className="text-sm text-slate-400">Belum ada API Key terdaftar. Sistem berjalan di mode read-only.</p>
           ) : (
             <div className="space-y-3">
               {keys.map((key) => (
                 <div key={key.id} className="rounded-lg border border-[#1E293B] bg-[#020617] p-4 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-white">{key.label || "API Key OKX"}</p>
-                    <p className="text-xs text-slate-500">Key: ****{key.api_key_last4}</p>
+                    <p className="text-xs text-slate-400">Key: ****{key.api_key_last4}</p>
                     <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
                       key.is_valid ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
                     }`}>

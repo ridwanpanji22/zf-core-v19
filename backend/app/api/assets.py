@@ -1,12 +1,12 @@
 import json
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models.asset import AssetRegistry, AssetSnapshot
 from app.api.deps import get_current_user
-from redis import Redis
+from redis.asyncio import Redis
 from app.config import settings
 
 router = APIRouter()
@@ -18,18 +18,15 @@ async def list_assets(
     db: AsyncSession = Depends(get_db)
 ):
     """List 200 assets with their latest metrics (cached in Redis, fallback DB)."""
-    # 1. Fetch active symbols
     res = await db.execute(select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
     symbols = [r[0] for r in res.all()]
 
     assets = []
     for symbol in symbols:
-        # Load from Redis cache
-        val = redis_client.get(f"metrics:{symbol}")
+        val = await redis_client.get(f"metrics:{symbol}")
         if val:
             assets.append(json.loads(val))
         else:
-            # Fallback helper representation
             assets.append({
                 "symbol": symbol,
                 "price": 0.0,
@@ -40,14 +37,13 @@ async def list_assets(
                 "mode": "heartbeat"
             })
 
-    # Sort by zf_score descending
     assets_sorted = sorted(assets, key=lambda x: x.get("zf_score", 0.0), reverse=True)
 
     return {
         "success": True,
         "data": assets_sorted,
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.get("/{symbol}")
@@ -62,8 +58,7 @@ async def get_asset_detail(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    # Load real-time stats
-    val = redis_client.get(f"metrics:{symbol}")
+    val = await redis_client.get(f"metrics:{symbol}")
     metrics = json.loads(val) if val else {
         "price": 0.0, "zf_score": 0.0, "psi_total": 0.0, "d_res": 0.0, "status": "normal", "mode": "heartbeat"
     }
@@ -81,13 +76,13 @@ async def get_asset_detail(
         "success": True,
         "data": data,
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.get("/{symbol}/history")
 async def get_asset_history(
     symbol: str,
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=1000),
     current_user = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -115,7 +110,7 @@ async def get_asset_history(
         "success": True,
         "data": history[::-1], # chronological order
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.get("/{symbol}/orderbook")
@@ -124,13 +119,13 @@ async def get_orderbook(
     current_user = Depends(get_current_user)
 ):
     """Get active orderbook depth analysis."""
-    val = redis_client.get(f"book:{symbol}")
+    val = await redis_client.get(f"book:{symbol}")
     if not val:
         return {
             "success": True,
             "data": {"bids": [], "asks": [], "bid_depth_ratio": 1.0},
             "error": None,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         }
 
     book = json.loads(val)
@@ -149,7 +144,7 @@ async def get_orderbook(
             "bid_depth_ratio": round(ratio, 2)
         },
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }
 
 @router.get("/{symbol}/liquidation-map")
@@ -158,8 +153,9 @@ async def get_liquidation_map(
     current_user = Depends(get_current_user)
 ):
     """Simulate liquidation zones representation map."""
-    # In Phase 1 MVP we return mock data points surrounding the active ticker price
-    val = redis_client.get(f"tick:{symbol}")
+    # ponytail: Phase 1 MVP — mock data around current price. Replace with real
+    #   liquidation data from OKX when execution engine is active (Phase 3).
+    val = await redis_client.get(f"tick:{symbol}")
     price = 60000.0
     if val:
         try:
@@ -167,7 +163,6 @@ async def get_liquidation_map(
         except Exception:
             pass
 
-    # Generate artificial cluster points around current price
     clusters = [
         {"price": round(price * 0.99, 2), "volume": 1500000.0, "side": "buy"},
         {"price": round(price * 0.98, 2), "volume": 3200000.0, "side": "buy"},
@@ -179,5 +174,5 @@ async def get_liquidation_map(
         "success": True,
         "data": clusters,
         "error": None,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
     }

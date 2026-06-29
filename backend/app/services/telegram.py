@@ -1,9 +1,18 @@
 import httpx
+import re
 import structlog
 from redis.asyncio import Redis
 from app.config import settings
 
 logger = structlog.get_logger()
+
+# Telegram MarkdownV2 special chars that must be escaped
+_MD_SPECIAL = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
+
+
+def escape_markdown(text: str) -> str:
+    """Escape special chars for Telegram MarkdownV2."""
+    return _MD_SPECIAL.sub(r"\\\1", text)
 
 class TelegramAlertSystem:
     def __init__(self):
@@ -25,7 +34,7 @@ class TelegramAlertSystem:
                     data={
                         "chat_id": self.chat_id,
                         "text": text,
-                        "parse_mode": "Markdown"
+                        "parse_mode": "MarkdownV2"
                     },
                     timeout=10.0
                 )
@@ -74,7 +83,7 @@ class TelegramAlertSystem:
         elif priority.lower() == "warning":
             emoji = "⚠️ [WARNING]"
 
-        payload_text = f"*{emoji}*\n{message}"
+        payload_text = f"*{escape_markdown(emoji)}*\n{escape_markdown(message)}"
 
         return await self.send_message(payload_text)
 
@@ -94,8 +103,8 @@ class TelegramAlertSystem:
         if not alerts:
             return
 
-        combined_text = "*⚠️ [WARNING] Ringkasan Alert Terakumulasi*\n\n"
-        combined_text += "\n".join(f"- {a}" for a in alerts)
+        combined_text = "*⚠️ \\[WARNING\\] Ringkasan Alert Terakumulasi*\n\n"
+        combined_text += "\n".join(f"\\- {escape_markdown(a)}" for a in alerts)
 
         await self.send_message(combined_text)
 

@@ -12,7 +12,10 @@ class UserApiKey(Base):
     api_key_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     secret_key_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     passphrase_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    # Each encrypted field gets its own nonce — AES-GCM requires unique nonce per encryption
+    api_key_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    secret_key_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    passphrase_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     api_key_last4: Mapped[str] = mapped_column(String(4), nullable=False)
     permission_level: Mapped[str | None] = mapped_column(String(20), nullable=True) # read_only | trade | withdraw
     is_valid: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

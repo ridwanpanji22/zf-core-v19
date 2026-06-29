@@ -1,32 +1,54 @@
 from contextlib import asynccontextmanager
 import asyncio
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.database import async_session_maker
 from app.models.user import User
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 # Import API routers
 from app.api import assets, predictions, system, calibration, websocket, auth, admin, api_keys, demo
 
 logger = structlog.get_logger()
 
+# Rate limiter — 200 req/min per IP (global default)
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
 # Global background tasks list to keep reference
 bg_tasks = set()
+
+def _validate_production_secrets():
+    """Fail-fast if production uses default secrets."""
+    if settings.APP_ENV != "production":
+        return
+    for name, val in [
+        ("JWT_SECRET", settings.JWT_SECRET),
+        ("DB_PASSWORD", settings.DB_PASSWORD),
+        ("API_KEY_ENCRYPTION_SECRET", settings.API_KEY_ENCRYPTION_SECRET),
+        ("REDIS_PASSWORD", settings.REDIS_PASSWORD),
+    ]:
+        if "changeme" in val.lower():
+            raise RuntimeError(
+                f"FATAL: {name} still contains default value. "
+                f"Set a secure random string in .env before running in production."
+            )
 
 async def seed_super_admin():
     """Seed super admin on application startup if none exists."""
     async with async_session_maker() as db:
         try:
-            # 1. Check if any super admin exists
             res = await db.execute(select(User).where(User.role == "super_admin"))
             if res.scalar_one_or_none():
                 logger.info("Super admin already exists, skipping seed")
                 return
 
-            # 2. If SUPER_ADMIN_EMAIL configured, seed it
             if settings.SUPER_ADMIN_EMAIL:
                 admin_user = User(
                     email=settings.SUPER_ADMIN_EMAIL,
@@ -42,20 +64,19 @@ async def seed_super_admin():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup lifecycle
+    # Validate secrets before anything else
+    _validate_production_secrets()
+
     logger.info("ZF-Core initial startup", env=settings.APP_ENV)
 
-    # Trigger super admin seed
     await seed_super_admin()
 
-    # Start Redis WebSocket pub/sub listener task
     task = asyncio.create_task(websocket.redis_listener())
     bg_tasks.add(task)
     task.add_done_callback(bg_tasks.discard)
 
     yield
 
-    # Shutdown lifecycle
     logger.info("ZF-Core graceful shutdown")
     for t in bg_tasks:
         t.cancel()
@@ -66,14 +87,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware config
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# CORS — restrict to configured frontend origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production setup
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global exception handler — never leak stack traces
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", path=request.url.path, error=str(exc), exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "data": None,
+            "error": {"message": "Internal server error"},
+        }
+    )
 
 # Include Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
@@ -88,7 +127,23 @@ app.include_router(websocket.router, tags=["WebSocket"])
 
 @app.get("/api/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "version": app.version
-    }
+    """Deep health check — verifies DB and Redis connectivity."""
+    checks = {"db": "ok", "redis": "ok"}
+    try:
+        async with async_session_maker() as db:
+            await db.execute(text("SELECT 1"))
+    except Exception:
+        checks["db"] = "error"
+    try:
+        from redis.asyncio import Redis as AsyncRedis
+        r = AsyncRedis.from_url(settings.REDIS_URL)
+        await r.ping()
+        await r.aclose()
+    except Exception:
+        checks["redis"] = "error"
+
+    healthy = all(v == "ok" for v in checks.values())
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content={"status": "healthy" if healthy else "degraded", "version": app.version, "checks": checks}
+    )

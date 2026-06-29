@@ -28,21 +28,39 @@ async def get_ws_user(token: str) -> User | None:
         pass
     return None
 
+MAX_WS_CONNECTIONS = 200  # Global cap — prevents OOM from connection flood
+MAX_PER_USER = 5          # Per-user cap — single user can't exhaust the pool
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
         self.subscriptions: dict[WebSocket, set[str]] = {}
+        self.user_connections: dict[int, int] = {}  # user_id -> count
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_id: int) -> bool:
+        """Accept connection if within limits. Returns False if rejected."""
+        if len(self.active_connections) >= MAX_WS_CONNECTIONS:
+            logger.warn("WS connection rejected — global limit reached", total=len(self.active_connections))
+            return False
+        if self.user_connections.get(user_id, 0) >= MAX_PER_USER:
+            logger.warn("WS connection rejected — per-user limit reached", user_id=user_id)
+            return False
+
         await websocket.accept()
         self.active_connections.append(websocket)
         self.subscriptions[websocket] = set()
+        self.user_connections[user_id] = self.user_connections.get(user_id, 0) + 1
+        return True
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket, user_id: int | None = None):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         if websocket in self.subscriptions:
             del self.subscriptions[websocket]
+        if user_id and user_id in self.user_connections:
+            self.user_connections[user_id] = max(0, self.user_connections[user_id] - 1)
+            if self.user_connections[user_id] == 0:
+                del self.user_connections[user_id]
 
     def subscribe(self, websocket: WebSocket, symbols: list[str]):
         if websocket in self.subscriptions:
@@ -91,11 +109,19 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
         await websocket.close(code=4008) # Policy Violation
         return
 
-    await manager.connect(websocket)
+    accepted = await manager.connect(websocket, user.id)
+    if not accepted:
+        await websocket.close(code=4013)  # Try Again Later
+        return
+
     try:
         while True:
             data_raw = await websocket.receive_text()
-            data = json.loads(data_raw)
+            try:
+                data = json.loads(data_raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({"error": "invalid JSON"}))
+                continue
             msg_type = data.get("type")
             if msg_type == "subscribe":
                 symbols = data.get("symbols", [])
@@ -104,7 +130,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
                 symbols = data.get("symbols", [])
                 manager.unsubscribe(websocket, symbols)
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, user.id)
     except Exception as e:
         logger.error("WebSocket connection error", error=str(e))
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, user.id)

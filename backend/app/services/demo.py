@@ -1,12 +1,12 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.demo import DemoWallet, DemoPosition
 from app.models.asset import AssetRegistry
-from redis import Redis
+from redis.asyncio import Redis
 from app.config import settings
 
 logger = structlog.get_logger()
@@ -36,7 +36,6 @@ async def reset_wallet(db: AsyncSession, user_id: int) -> DemoWallet:
     """Close all open virtual positions, reset wallet balance and stats."""
     wallet = await get_or_create_wallet(db, user_id)
 
-    # 1. Close all open positions at current market price
     pos_res = await db.execute(
         select(DemoPosition)
         .where(DemoPosition.user_id == user_id)
@@ -46,13 +45,12 @@ async def reset_wallet(db: AsyncSession, user_id: int) -> DemoWallet:
     for pos in open_positions:
         await close_position(db, user_id, pos.id, reason="manual")
 
-    # 2. Reset balance and stats
     initial = Decimal(str(settings.DEMO_INITIAL_BALANCE))
     wallet.balance = initial
     wallet.total_pnl = Decimal("0.0")
     wallet.total_trades = 0
     wallet.win_trades = 0
-    wallet.last_reset_at = datetime.utcnow()
+    wallet.last_reset_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(wallet)
@@ -68,7 +66,6 @@ async def open_position(
     leverage: int
 ) -> DemoPosition:
     """Open a virtual position if margin is available."""
-    # 1. Validate leverage and bounds
     max_lev = settings.DEMO_MAX_LEVERAGE
     if leverage < 1 or leverage > max_lev:
         raise ValueError(f"Leverage must be between 1 and {max_lev}")
@@ -76,21 +73,18 @@ async def open_position(
     if size_usdt <= 0:
         raise ValueError("Order size must be greater than 0")
 
-    # 2. Check if asset active
     reg_res = await db.execute(select(AssetRegistry).where(AssetRegistry.symbol == symbol))
     asset = reg_res.scalar_one_or_none()
     if not asset or not asset.is_active:
         raise ValueError("Asset is inactive or not registered")
 
-    # 3. Fetch current mark price from Redis
-    val = redis_client.get(f"metrics:{symbol}")
+    val = await redis_client.get(f"metrics:{symbol}")
     if not val:
         raise ValueError(f"No real-time market data available for {symbol}")
 
     metrics = json.loads(val)
     price = Decimal(str(metrics["price"]))
 
-    # 4. Check available margin in wallet
     wallet = await get_or_create_wallet(db, user_id)
     margin = Decimal(str(size_usdt)) / Decimal(str(leverage))
     fee = Decimal(str(size_usdt)) * Decimal("0.0005") # 0.05% taker fee
@@ -98,10 +92,8 @@ async def open_position(
     if wallet.balance < (margin + fee):
         raise ValueError("Insufficient demo balance to cover margin and fee")
 
-    # Deduct margin + fee
     wallet.balance -= (margin + fee)
 
-    # 5. Insert virtual position
     pos = DemoPosition(
         user_id=user_id,
         symbol=symbol,
@@ -112,7 +104,7 @@ async def open_position(
         margin=margin,
         fee=fee,
         status="open",
-        opened_at=datetime.utcnow()
+        opened_at=datetime.now(timezone.utc)
     )
     db.add(pos)
     await db.commit()
@@ -133,8 +125,7 @@ async def close_position(db: AsyncSession, user_id: int, position_id: int, reaso
     if not pos:
         raise ValueError("Position not found or already closed")
 
-    # 1. Fetch current price from Redis
-    val = redis_client.get(f"metrics:{pos.symbol}")
+    val = await redis_client.get(f"metrics:{pos.symbol}")
     price = pos.entry_price # fallback
     if val:
         try:
@@ -142,30 +133,26 @@ async def close_position(db: AsyncSession, user_id: int, position_id: int, reaso
         except Exception:
             pass
 
-    # 2. Calculate PnL
-    # Long: PnL = (exit_price - entry_price) / entry_price * size
-    # Short: PnL = (entry_price - exit_price) / entry_price * size
+    # PnL = ((exit - entry) / entry) * size * leverage
+    # Leverage multiplier is CRITICAL — without it, 10x position PnL = 1x position PnL
     entry = Decimal(str(pos.entry_price))
     size = Decimal(str(pos.size_usdt))
     leverage = Decimal(str(pos.leverage))
 
     if pos.side == "long":
-        pnl = ((price - entry) / entry) * size
+        pnl = ((price - entry) / entry) * size * leverage
     else:
-        pnl = ((entry - price) / entry) * size
+        pnl = ((entry - price) / entry) * size * leverage
 
-    # Close fee
     close_fee = size * Decimal("0.0005")
 
-    # 3. Update Position
     pos.exit_price = price
     pos.pnl = pnl
     pos.fee += close_fee
     pos.status = "closed"
     pos.close_reason = reason
-    pos.closed_at = datetime.utcnow()
+    pos.closed_at = datetime.now(timezone.utc)
 
-    # 4. Return margin + PnL - close_fee to wallet
     wallet = await get_or_create_wallet(db, user_id)
     return_amount = pos.margin + pnl - close_fee
 
@@ -186,8 +173,7 @@ async def check_liquidations(db: AsyncSession):
     positions = res.scalars().all()
 
     for pos in positions:
-        # Fetch price
-        val = redis_client.get(f"metrics:{pos.symbol}")
+        val = await redis_client.get(f"metrics:{pos.symbol}")
         if not val:
             continue
         try:
@@ -195,20 +181,19 @@ async def check_liquidations(db: AsyncSession):
         except Exception:
             continue
 
-        # Calculate unrealized loss
         entry = Decimal(str(pos.entry_price))
         size = Decimal(str(pos.size_usdt))
+        leverage = Decimal(str(pos.leverage))
 
         if pos.side == "long":
-            unrealized_pnl = ((price - entry) / entry) * size
+            unrealized_pnl = ((price - entry) / entry) * size * leverage
         else:
-            unrealized_pnl = ((entry - price) / entry) * size
+            unrealized_pnl = ((entry - price) / entry) * size * leverage
 
-        # Liquidation point: loss >= margin
+        # Liquidation: loss >= margin
         if -unrealized_pnl >= pos.margin:
             logger.info("Liquidating demo position", id=pos.id, symbol=pos.symbol, pnl=unrealized_pnl)
             try:
-                # Force close
                 await close_position(db, pos.user_id, pos.id, reason="liquidation")
             except Exception as e:
                 logger.error("Failed to liquidate position", id=pos.id, error=str(e))

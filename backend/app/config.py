@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "changeme"
 
     # Redis
-    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_URL: str = "redis://:changeme@redis:6379/0"
+    REDIS_PASSWORD: str = "changeme"
 
     # OKX API
     OKX_API_KEY: str = ""
@@ -50,6 +51,7 @@ class Settings(BaseSettings):
     DEMO_ENABLED: bool = True
     DEMO_INITIAL_BALANCE: float = 10000.0
     DEMO_MAX_LEVERAGE: int = 10
+    CORS_ORIGINS: list[str] = ["http://localhost:3000"] # Override in .env for production
 
     @property
     def database_url(self) -> str:

@@ -2,7 +2,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000" # Internal only — reverse proxy via OpenLiteSpeed
     depends_on:
       db:
         condition: service_healthy
@@ -11,15 +11,23 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    networks: [frontend, backend, data]
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
+        reservations:
+          memory: 1G
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
 
   celery-worker:
     build: ./backend
-    command: celery -A app.services.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A app.services.celery_app worker --loglevel=info --pool=prefork --concurrency=2
     depends_on:
       db:
         condition: service_healthy
@@ -28,37 +36,71 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    networks: [backend, data]
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '2'
+        reservations:
+          memory: 512M
 
   celery-beat:
     build: ./backend
     command: celery -A app.services.celery_app beat --loglevel=info
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     env_file:
       - .env
     restart: unless-stopped
+    networks: [backend, data]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
 
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000" # Internal only — reverse proxy via OpenLiteSpeed
     env_file:
       - .env
     restart: unless-stopped
+    networks: [frontend]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
 
   db:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.17.2-pg16
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: zfcore
       POSTGRES_USER: zfcore
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5432:5432" # Bind only to localhost loopback for security
+    # ports:  # Uncomment for local debugging only
+    #   - "127.0.0.1:5432:5432"
     restart: unless-stopped
+    networks: [data]
     shm_size: '1gb' # Shared memory increased to prevent OOM on aggregator joins
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1'
+        reservations:
+          memory: 512M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zfcore -d zfcore"]
       interval: 10s
@@ -69,15 +111,28 @@ services:
     image: redis:7-alpine
     volumes:
       - redisdata:/data
-    ports:
-      - "127.0.0.1:6379:6379"
+    # ports:  # Uncomment for local debugging only
+    #   - "127.0.0.1:6379:6379"
     restart: unless-stopped
-    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru # Keep Celery broker queues safe from eviction
+    networks: [data]
+    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  frontend:   # frontend <-> backend only
+  backend:    # backend <-> celery <-> data
+  data:       # db + redis (internal only)
 
 volumes:
   pgdata:

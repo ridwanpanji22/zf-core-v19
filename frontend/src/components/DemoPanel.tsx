@@ -230,7 +230,7 @@ export default function DemoPanel() {
                 <tbody className="divide-y divide-[#1E293B]/50">
                   {positions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-4 text-center text-slate-500">Tidak ada posisi demo terbuka</td>
+                      <td colSpan={9} className="py-4 text-center text-slate-400">Tidak ada posisi demo terbuka</td>
                     </tr>
                   ) : (
                     positions.map((pos) => {
@@ -277,7 +277,7 @@ export default function DemoPanel() {
                 <tbody className="divide-y divide-[#1E293B]/50">
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-4 text-center text-slate-500">Belum ada transaksi historis demo</td>
+                      <td colSpan={9} className="py-4 text-center text-slate-400">Belum ada transaksi historis demo</td>
                     </tr>
                   ) : (
                     history.map((pos) => {

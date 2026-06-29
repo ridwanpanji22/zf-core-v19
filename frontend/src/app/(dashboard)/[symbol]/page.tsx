@@ -225,7 +225,7 @@ export default function AssetDetailPage({ params }: PageProps) {
               onChange={(e) => setLeverage(Number(e.target.value))}
               className="w-full accent-[#00FF88]"
             />
-            <span className="block text-[10px] text-slate-500">Maksimal leverage demo: 10x</span>
+            <span className="block text-[10px] text-slate-400">Maksimal leverage demo: 10x</span>
           </div>
 
           <div className="border-t border-[#1E293B] pt-4 space-y-2 text-xs text-slate-400">

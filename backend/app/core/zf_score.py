@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 @dataclass
@@ -7,6 +8,8 @@ class ZFScoreResult:
     mode: str
 
 def min_max_scale(val: float, min_val: float, max_val: float) -> float:
+    if math.isnan(val) or math.isinf(val):
+        return 0.0
     if max_val - min_val <= 0:
         return 0.0
     scaled = (val - min_val) / (max_val - min_val)

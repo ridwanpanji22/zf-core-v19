@@ -84,13 +84,15 @@ export default function AssetTable() {
           placeholder="Cari aset... (e.g. BTC)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-md border border-[#1E293B] bg-[#0F172A] px-4 py-2 text-sm text-white focus:border-[#00FF88] focus:outline-none"
+          aria-label="Cari aset berdasarkan simbol"
+          className="w-full max-w-xs rounded-md border border-[#1E293B] bg-[#0F172A] px-4 py-2 text-sm text-white focus:border-[#00FF88] focus:outline-none focus:ring-1 focus:ring-[#00FF88]"
         />
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="rounded-md border border-[#1E293B] bg-[#0F172A] px-3 py-2 text-xs text-white focus:outline-none"
+            aria-label="Filter berdasarkan status aset"
+            className="rounded-md border border-[#1E293B] bg-[#0F172A] px-3 py-2 text-xs text-white focus:border-[#00FF88] focus:outline-none focus:ring-1 focus:ring-[#00FF88]"
           >
             <option value="all">Semua Status</option>
             <option value="normal">Normal</option>
@@ -100,7 +102,8 @@ export default function AssetTable() {
           <select
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value)}
-            className="rounded-md border border-[#1E293B] bg-[#0F172A] px-3 py-2 text-xs text-white focus:outline-none"
+            aria-label="Filter berdasarkan mode analisis"
+            className="rounded-md border border-[#1E293B] bg-[#0F172A] px-3 py-2 text-xs text-white focus:border-[#00FF88] focus:outline-none focus:ring-1 focus:ring-[#00FF88]"
           >
             <option value="all">Semua Mode</option>
             <option value="heartbeat">Heartbeat</option>
@@ -110,18 +113,22 @@ export default function AssetTable() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[#1E293B] bg-[#0F172A]">
-        <table className="w-full border-collapse text-left text-sm text-slate-300">
+        <table
+          className="w-full border-collapse text-left text-sm text-slate-300"
+          role="grid"
+          aria-label="Tabel 200 Aset Kripto — ZF-Score & Structural Tension"
+        >
           <thead className="bg-[#1E293B]/50 text-xs font-bold uppercase tracking-wider text-slate-400">
             <tr className="border-b border-[#1E293B]">
-              <th className="px-6 py-4">#</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white" onClick={() => handleSort("symbol")}>Aset</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white" onClick={() => handleSort("price")}>Harga</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white" onClick={() => handleSort("delta_24h")}>Δ 24h</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white text-[#00FF88]" onClick={() => handleSort("zf_score")}>ZF-Score</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white" onClick={() => handleSort("psi_total")}>Ψ_total</th>
-              <th className="cursor-pointer px-6 py-4 hover:text-white" onClick={() => handleSort("d_res")}>D_res</th>
-              <th className="px-6 py-4">Mode</th>
-              <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4" scope="col">#</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white" scope="col" onClick={() => handleSort("symbol")} aria-sort={sortField === "symbol" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>Aset</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white" scope="col" onClick={() => handleSort("price")} aria-sort={sortField === "price" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>Harga</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white" scope="col" onClick={() => handleSort("delta_24h")} aria-sort={sortField === "delta_24h" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>Δ 24h</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white text-[#00FF88]" scope="col" onClick={() => handleSort("zf_score")} aria-sort={sortField === "zf_score" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>ZF-Score</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white" scope="col" onClick={() => handleSort("psi_total")} aria-sort={sortField === "psi_total" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>Ψ_total</th>
+              <th className="cursor-pointer px-6 py-4 hover:text-white" scope="col" onClick={() => handleSort("d_res")} aria-sort={sortField === "d_res" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}>D_res</th>
+              <th className="px-6 py-4" scope="col">Mode</th>
+              <th className="px-6 py-4" scope="col">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1E293B] bg-[#0F172A]/50">
@@ -129,7 +136,11 @@ export default function AssetTable() {
               <tr
                 key={asset.symbol}
                 onClick={() => router.push(`/dashboard/${asset.symbol}`)}
-                className="cursor-pointer border-b border-[#1E293B] transition-colors duration-150 hover:bg-[#1E293B]/30"
+                onKeyDown={(e) => e.key === "Enter" && router.push(`/dashboard/${asset.symbol}`)}
+                tabIndex={0}
+                role="row"
+                aria-label={`${asset.symbol} — ZF-Score ${asset.zf_score.toFixed(4)}, Status ${asset.status}`}
+                className="cursor-pointer border-b border-[#1E293B] transition-colors duration-150 hover:bg-[#1E293B]/30 focus:outline-none focus:bg-[#1E293B]/50 focus:ring-1 focus:ring-inset focus:ring-[#00FF88]/50"
               >
                 <td className="px-6 py-4 font-medium">{index + 1}</td>
                 <td className="px-6 py-4 font-bold text-white">{asset.symbol}</td>

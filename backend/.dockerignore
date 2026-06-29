@@ -1,0 +1,13 @@
+.git
+.env
+*.env
+__pycache__
+.venv
+venv
+tests
+docs
+*.md
+.github
+.gitignore
+ruff.toml
+alembic/versions/*.pyc

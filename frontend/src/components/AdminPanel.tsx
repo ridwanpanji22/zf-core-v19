@@ -204,7 +204,7 @@ export default function AdminPanel() {
             <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">Mode Demo Global</p>
-                <p className="text-xs text-slate-500">Aktifkan/nonaktifkan fitur paper trading untuk semua user.</p>
+                <p className="text-xs text-slate-400">Aktifkan/nonaktifkan fitur paper trading untuk semua user.</p>
               </div>
               <select
                 disabled={updating}
@@ -220,7 +220,7 @@ export default function AdminPanel() {
             <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">Saldo Demo Awal</p>
-                <p className="text-xs text-slate-500">Jumlah saldo virtual default (USDT) saat user auto-register.</p>
+                <p className="text-xs text-slate-400">Jumlah saldo virtual default (USDT) saat user auto-register.</p>
               </div>
               <input
                 type="number"
@@ -234,7 +234,7 @@ export default function AdminPanel() {
             <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">Leverage Maksimal Demo</p>
-                <p className="text-xs text-slate-500">Batas maksimal leverage yang dapat diatur oleh trader di mode demo.</p>
+                <p className="text-xs text-slate-400">Batas maksimal leverage yang dapat diatur oleh trader di mode demo.</p>
               </div>
               <input
                 type="number"
