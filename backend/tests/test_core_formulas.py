@@ -81,8 +81,8 @@ class TestDrift:
 class TestVwap:
     def test_basic_vwap(self):
         trades = [
-            {"price": 100.0, "amount": 10.0},
-            {"price": 200.0, "amount": 10.0},
+            {"price": 100.0, "size": 10.0},
+            {"price": 200.0, "size": 10.0},
         ]
         vwap = calculate_vwap(trades)
         assert abs(vwap - 150.0) < 0.01
