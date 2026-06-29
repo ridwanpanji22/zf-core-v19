@@ -78,7 +78,7 @@ jobs:
         run: |
           cd frontend
           npm ci
-          npx tsc --noEmit
+          npx next build
 
   security:
     needs: lint
