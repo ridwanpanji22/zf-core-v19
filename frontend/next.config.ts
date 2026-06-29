@@ -32,14 +32,15 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://backend:8000";
     return [
       {
         source: "/api/:path*",
-        destination: "http://backend:8000/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
       },
       {
         source: "/ws/:path*",
-        destination: "ws://backend:8000/ws/:path*",
+        destination: `${backendUrl}/ws/:path*`,
       },
     ];
   },
