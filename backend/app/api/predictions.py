@@ -1,14 +1,16 @@
 import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
+from redis.asyncio import Redis
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+
+from app.api.deps import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.models.asset import AssetRegistry
 from app.models.prediction import PredictionLog
-from app.api.deps import get_current_user
-from redis.asyncio import Redis
-from app.config import settings
 
 router = APIRouter()
 redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)

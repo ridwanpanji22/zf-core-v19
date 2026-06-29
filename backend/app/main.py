@@ -1,20 +1,21 @@
-from contextlib import asynccontextmanager
 import asyncio
+from contextlib import asynccontextmanager
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from app.config import settings
-from app.database import async_session_maker
-from app.models.user import User
+from slowapi.util import get_remote_address
 from sqlalchemy import select, text
 
 # Import API routers
-from app.api import assets, predictions, system, calibration, websocket, auth, admin, api_keys, demo
+from app.api import admin, api_keys, assets, auth, calibration, demo, predictions, system, websocket
+from app.config import settings
+from app.database import async_session_maker
+from app.models.user import User
 
 logger = structlog.get_logger()
 

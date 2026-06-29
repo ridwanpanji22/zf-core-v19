@@ -3,19 +3,22 @@ import json
 import os
 import subprocess
 from datetime import datetime, timedelta, timezone
+
 import structlog
 from redis import Redis
-from sqlalchemy import select, desc
-from app.services.celery_app import celery_app
-from app.database import async_session_maker
+from sqlalchemy import select
+
 from app.config import settings
-from app.core.drift import calculate_drift, calculate_vwap
-from app.core.zf_score import calculate_zf_score
-from app.core.psi_total import calculate_psi_total
-from app.core.decay import predict_decay
-from app.core.calibration import recalibrate_omega as recalib_omg
 from app.core.asset_swarm import AssetSwarmManager
-from app.services import mbs, demo as demo_service
+from app.core.calibration import recalibrate_omega as recalib_omg
+from app.core.decay import predict_decay
+from app.core.drift import calculate_drift, calculate_vwap
+from app.core.psi_total import calculate_psi_total
+from app.core.zf_score import calculate_zf_score
+from app.database import async_session_maker
+from app.services import demo as demo_service
+from app.services import mbs
+from app.services.celery_app import celery_app
 
 logger = structlog.get_logger()
 # ponytail: Celery workers run sync — sync Redis OK here. Upgrade to redis.asyncio
@@ -205,7 +208,7 @@ async def calculate_heartbeat():
             d_res = abs(p_market - last_price) / last_price * 100 if last_price > 0 else 0.0
 
             zf_result = calculate_zf_score(
-                d_res=d_res, oi_ratio=0.0, fr_divergence=fr_div,
+                d_res=d_res, oi_ratio=oi_val / 1e6 if oi_val > 0 else 0.0, fr_divergence=fr_div,
                 liq_density=0.0, book_imbalance=1.0
             )
 

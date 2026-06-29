@@ -1,10 +1,11 @@
 import asyncio
 import json
+
 import ccxt.pro as ccxtpro
 import structlog
 from redis.asyncio import Redis
+
 from app.config import settings
-from app.ingestion.normalizer import normalize
 
 logger = structlog.get_logger()
 

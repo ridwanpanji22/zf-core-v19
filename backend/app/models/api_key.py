@@ -1,7 +1,10 @@
 from datetime import datetime
-from sqlalchemy import String, Boolean, Integer, DateTime, LargeBinary, ForeignKey
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import Base
+
 
 class UserApiKey(Base):
     __tablename__ = "user_api_keys"

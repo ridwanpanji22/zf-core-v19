@@ -1,15 +1,16 @@
-import json
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete
-from app.database import get_db
+
 from app.api.deps import require_role
-from app.models.user import User
+from app.database import get_db
 from app.models.api_key import UserApiKey
 from app.models.config import SystemConfig
 from app.models.session import SystemEvent
-from pydantic import BaseModel
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(require_role("super_admin"))])
 

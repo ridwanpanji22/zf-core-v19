@@ -1,7 +1,9 @@
 from datetime import datetime
-from sqlalchemy import String, Boolean, Integer, Float, DateTime, Text, CheckConstraint, ForeignKey
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import Base
 
 

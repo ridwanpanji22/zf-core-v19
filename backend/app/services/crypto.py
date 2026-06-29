@@ -1,8 +1,11 @@
+import os
+
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
-import os
+
 from app.config import settings
+
 
 def get_encryption_key() -> bytes:
     """Derive a 32-byte AES key from API_KEY_ENCRYPTION_SECRET using HKDF."""

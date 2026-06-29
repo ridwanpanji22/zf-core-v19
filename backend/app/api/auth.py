@@ -1,15 +1,17 @@
+from datetime import datetime
+
 import httpx
 import structlog
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.database import get_db
-from app.config import settings
-from app.models.user import User
-from app.api.deps import create_access_token, create_refresh_token, get_current_user
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import create_access_token, create_refresh_token, get_current_user
+from app.config import settings
+from app.database import get_db
+from app.models.user import User
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -140,7 +142,7 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 @router.post("/refresh")
 async def refresh_token(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
     """Exchange a valid refresh token for a new access token."""
-    from jose import jwt, JWTError
+    from jose import JWTError, jwt
     try:
         data = jwt.decode(payload.refresh_token, settings.JWT_SECRET, algorithms=["HS256"])
         if data.get("type") != "refresh":

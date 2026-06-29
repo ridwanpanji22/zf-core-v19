@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def predict_decay(zf_scores_30d: list[float], psi_totals_30d: list[float]) -> float:
     """Predict price decay direction (Decay_t) over next 10 days.
 

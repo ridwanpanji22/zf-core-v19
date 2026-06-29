@@ -1,13 +1,15 @@
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
+
 import structlog
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.demo import DemoWallet, DemoPosition
-from app.models.asset import AssetRegistry
 from redis.asyncio import Redis
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.config import settings
+from app.models.asset import AssetRegistry
+from app.models.demo import DemoPosition, DemoWallet
 
 logger = structlog.get_logger()
 redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)

@@ -1,8 +1,10 @@
+from datetime import datetime
+
 import numpy as np
 import structlog
-from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.asset import AssetRegistry, AssetSnapshot
 
 logger = structlog.get_logger()

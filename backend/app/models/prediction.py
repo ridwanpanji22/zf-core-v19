@@ -1,7 +1,10 @@
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, DateTime
+
+from sqlalchemy import DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import Base
+
 
 class PredictionLog(Base):
     __tablename__ = "prediction_log"

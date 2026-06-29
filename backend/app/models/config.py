@@ -1,8 +1,11 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, Integer
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.models.base import Base
+
 
 class SystemConfig(Base):
     __tablename__ = "system_config"

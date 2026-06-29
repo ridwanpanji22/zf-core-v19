@@ -1,15 +1,17 @@
 import asyncio
-import ccxt
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.database import get_db
-from app.api.deps import get_current_user
-from app.models.api_key import UserApiKey
-from app.services.crypto import encrypt, decrypt
-from pydantic import BaseModel, Field
+
+import ccxt
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
+from app.database import get_db
+from app.models.api_key import UserApiKey
+from app.services.crypto import decrypt, encrypt
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -31,10 +33,10 @@ async def test_okx_connection(api_key: str, secret_key: str, passphrase: str) ->
     try:
         await asyncio.to_thread(exchange.fetch_balance)
         return "trade"
-    except ccxt.AuthenticationError as e:
+    except ccxt.AuthenticationError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"OKX API Validation Failed: Invalid credentials"
+            detail="OKX API Validation Failed: Invalid credentials"
         )
     except ccxt.NetworkError:
         raise HTTPException(

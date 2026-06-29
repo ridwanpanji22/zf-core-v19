@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+
 @dataclass
 class ZFScoreResult:
     score: float

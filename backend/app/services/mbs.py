@@ -1,11 +1,12 @@
-import json
+from datetime import datetime
+
 import structlog
-from datetime import datetime, timezone
-from sqlalchemy import select, desc, func
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.asset import AssetSnapshot, AssetRegistry
-from app.models.session import SessionJournal, SystemEvent
-from app.models.prediction import CalibrationLog, PredictionLog
+
+from app.models.asset import AssetRegistry, AssetSnapshot
+from app.models.prediction import CalibrationLog
+from app.models.session import SessionJournal
 
 logger = structlog.get_logger()
 
@@ -105,7 +106,6 @@ async def load_and_merge(db_session: AsyncSession) -> list[dict]:
         logger.info("Loading and merging previous session state")
 
         # Single query: latest snapshot per active symbol using DISTINCT ON
-        from sqlalchemy import text
         stmt = (
             select(AssetSnapshot)
             .join(AssetRegistry, AssetRegistry.symbol == AssetSnapshot.symbol)

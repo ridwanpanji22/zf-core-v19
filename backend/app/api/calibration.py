@@ -1,10 +1,11 @@
-import json
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
-from app.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user, require_role
+from app.database import get_db
 from app.models.prediction import CalibrationLog
 from app.models.session import SystemEvent
 from app.services.tasks import recalibrate_omega as trigger_task

@@ -1,7 +1,9 @@
-import httpx
 import re
+
+import httpx
 import structlog
 from redis.asyncio import Redis
+
 from app.config import settings
 
 logger = structlog.get_logger()

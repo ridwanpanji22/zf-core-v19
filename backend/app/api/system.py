@@ -1,14 +1,15 @@
-import json
 from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.database import get_db
-from app.api.deps import get_current_user, require_role
-from app.models.session import SessionJournal, SystemEvent
-from app.models.config import SystemConfig
+from fastapi.responses import JSONResponse
 from redis import Redis
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user, require_role
 from app.config import settings
+from app.database import get_db
+from app.models.session import SessionJournal, SystemEvent
 
 router = APIRouter()
 redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -162,7 +163,7 @@ async def get_detailed_health(db: AsyncSession = Depends(get_db)):
 
     status_code = status.HTTP_200_OK if (db_alive and redis_alive) else status.HTTP_503_SERVICE_UNAVAILABLE
 
-    return {
+    return JSONResponse(status_code=status_code, content={
         "success": db_alive and redis_alive,
         "data": {
             "status": "healthy" if (db_alive and redis_alive) else "unhealthy",
@@ -173,4 +174,4 @@ async def get_detailed_health(db: AsyncSession = Depends(get_db)):
         },
         "error": None if (db_alive and redis_alive) else {"code": "SERVICE_UNAVAILABLE", "message": "Backend dependencies connection failure"},
         "timestamp": datetime.utcnow().isoformat() + "Z"
-    }
+    })

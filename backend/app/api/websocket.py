@@ -1,13 +1,14 @@
-import asyncio
 import json
+
 import structlog
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
-from jose import jwt, JWTError
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from jose import JWTError, jwt
 from redis.asyncio import Redis
+from sqlalchemy import select
+
 from app.config import settings
 from app.database import async_session_maker
 from app.models.user import User
-from sqlalchemy import select
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -91,7 +92,6 @@ async def redis_listener():
         async for message in pubsub.listen():
             if message["type"] == "message":
                 data = json.loads(message["data"])
-                msg_type = data.get("type")
                 payload = data.get("data", {})
                 symbol = payload.get("symbol", "")
                 await manager.broadcast_to_subscribers(symbol, data)
