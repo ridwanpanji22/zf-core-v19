@@ -72,7 +72,7 @@ services:
     image: ghcr.io/ridwanpanji22/zf-core-v19/frontend:latest
     build: ./frontend
     ports:
-      - "127.0.0.1:3000:3000" # Internal only — reverse proxy via OpenLiteSpeed
+      - "127.0.0.1:3001:3000" # Internal only — reverse proxy via OpenLiteSpeed (3000 used by nghttpx)
     env_file:
       - .env
     restart: unless-stopped
