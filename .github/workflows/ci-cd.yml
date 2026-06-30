@@ -205,6 +205,25 @@ jobs:
               echo "⚠️ Migration failed — check logs. Containers are still running."
               exit 1
             }
+
+            # Create TimescaleDB continuous aggregate (cannot run inside Alembic transaction)
+            docker compose exec -T db psql -U zfcore -d zfcore -c "
+              CREATE MATERIALIZED VIEW IF NOT EXISTS asset_daily_aggregates
+              WITH (timescaledb.continuous) AS
+              SELECT
+                time_bucket('1 day', time) AS day,
+                symbol,
+                AVG(zf_score) AS avg_zf_score,
+                MAX(zf_score) AS max_zf_score,
+                AVG(psi_total) AS avg_psi_total,
+                FIRST(price, time) AS open_price,
+                LAST(price, time) AS close_price,
+                MAX(price) AS high_price,
+                MIN(price) AS low_price,
+                AVG(volume_24h) AS avg_volume
+              FROM asset_snapshots
+              GROUP BY day, symbol;
+            " || echo "⚠️ Continuous aggregate already exists or failed — non-fatal"
             echo "✅ Deploy completed successfully"
 
       - name: Send Telegram Notification (Success)
