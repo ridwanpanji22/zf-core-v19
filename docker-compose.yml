@@ -4,6 +4,9 @@ services:
     build: ./backend
     ports:
       - "127.0.0.1:8000:8000" # Internal only — reverse proxy via OpenLiteSpeed
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       db:
         condition: service_healthy
@@ -30,6 +33,9 @@ services:
     image: ghcr.io/ridwanpanji22/zf-core-v19/backend:latest
     build: ./backend
     command: celery -A app.services.celery_app worker --loglevel=info --pool=prefork --concurrency=2
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       db:
         condition: service_healthy
