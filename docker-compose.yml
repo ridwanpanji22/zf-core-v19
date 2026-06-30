@@ -1,5 +1,6 @@
 services:
   backend:
+    image: ghcr.io/ridwanpanji22/zf-core-v19/backend:latest
     build: ./backend
     ports:
       - "127.0.0.1:8000:8000" # Internal only — reverse proxy via OpenLiteSpeed
@@ -26,6 +27,7 @@ services:
       retries: 3
 
   celery-worker:
+    image: ghcr.io/ridwanpanji22/zf-core-v19/backend:latest
     build: ./backend
     command: celery -A app.services.celery_app worker --loglevel=info --pool=prefork --concurrency=2
     depends_on:
@@ -46,6 +48,7 @@ services:
           memory: 512M
 
   celery-beat:
+    image: ghcr.io/ridwanpanji22/zf-core-v19/backend:latest
     build: ./backend
     command: celery -A app.services.celery_app beat --loglevel=info
     depends_on:
@@ -66,6 +69,7 @@ services:
           memory: 128M
 
   frontend:
+    image: ghcr.io/ridwanpanji22/zf-core-v19/frontend:latest
     build: ./frontend
     ports:
       - "127.0.0.1:3000:3000" # Internal only — reverse proxy via OpenLiteSpeed

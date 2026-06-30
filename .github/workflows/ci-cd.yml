@@ -163,10 +163,13 @@ jobs:
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_TOKEN
           script: |
             set -e
             cd /home/ridwan/zf-core-v19
@@ -174,16 +177,28 @@ jobs:
             # Ensure backup directory exists
             mkdir -p /home/ridwan/backups
 
-            # Backup DB before deploy (CLAUDE.md mandate) — abort on failure
-            docker compose exec -T db pg_dump -U zfcore zfcore | gzip > /home/ridwan/backups/zfcore_$(date +%Y%m%d_%H%M%S).sql.gz
-            if [ $? -ne 0 ]; then
-              echo "❌ DB backup failed — aborting deploy"
-              exit 1
+            # Backup DB before deploy (CLAUDE.md mandate) — skip on first deploy
+            if docker compose ps db --status running -q 2>/dev/null | grep -q .; then
+              docker compose exec -T db pg_dump -U zfcore zfcore | gzip > /home/ridwan/backups/zfcore_$(date +%Y%m%d_%H%M%S).sql.gz
+              if [ $? -ne 0 ]; then
+                echo "❌ DB backup failed — aborting deploy"
+                exit 1
+              fi
+              echo "✅ DB backup completed"
+            else
+              echo "⏭️ No running DB container — skipping backup (first deploy)"
             fi
+
+            # Login to GHCR
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ridwanpanji22 --password-stdin
 
             git pull origin main
             docker compose pull
             docker compose up -d --remove-orphans
+
+            # Wait for DB to be healthy before migration
+            echo "⏳ Waiting for DB..."
+            timeout 60 bash -c 'until docker compose exec -T db pg_isready -U zfcore; do sleep 2; done'
 
             # Run pending migrations — rollback on failure
             docker compose exec -T backend alembic upgrade head || {
@@ -191,6 +206,7 @@ jobs:
               docker compose exec -T backend alembic downgrade -1
               exit 1
             }
+            echo "✅ Deploy completed successfully"
 
       - name: Send Telegram Notification (Success)
         if: success()
