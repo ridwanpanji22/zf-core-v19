@@ -63,6 +63,9 @@ log.md
 *.log
 docker-compose.override.yml
 
+# SSL Certificates (NEVER commit)
+certs/
+
 # OS
 .DS_Store
 Thumbs.db

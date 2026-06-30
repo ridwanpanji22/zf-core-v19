@@ -95,6 +95,8 @@ services:
     build: ./ws-proxy
     ports:
       - "0.0.0.0:8443:8443" # Public — Cloudflare proxied via ws.zf.nexacore.my.id
+    volumes:
+      - ./certs:/etc/nginx/certs:ro # Cloudflare Origin Certificate
     depends_on:
       backend:
         condition: service_healthy
