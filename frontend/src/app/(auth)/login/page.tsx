@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setTokens, isAuthenticated } from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -75,5 +75,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#020617]"><span className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" /></div>}>
+      <LoginInner />
+    </Suspense>
   );
 }

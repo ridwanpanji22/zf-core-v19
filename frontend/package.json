@@ -26,6 +26,7 @@
     "@types/node": "^20.17.9",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.5.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^15.5.19",
     "postcss": "^8.4.49",
