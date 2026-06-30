@@ -60,7 +60,7 @@ async def get_asset_detail(
     """Retrieve detailed metadata for a single asset."""
     res = await db.execute(select(AssetRegistry).where(AssetRegistry.symbol == symbol))
     asset = res.scalar_one_or_none()
-    if not asset:
+    if not asset and symbol not in settings.BOOTSTRAP_SYMBOLS:
         raise HTTPException(status_code=404, detail="Asset not found")
 
     val = await redis_client.get(f"metrics:{symbol}")
@@ -68,12 +68,13 @@ async def get_asset_detail(
         "price": 0.0, "zf_score": 0.0, "psi_total": 0.0, "d_res": 0.0, "status": "normal", "mode": "heartbeat"
     }
 
+    # ponytail: bootstrap fallback when asset_registry empty (pre-seed)
     data = {
-        "symbol": asset.symbol,
-        "base_currency": asset.base_currency,
-        "cluster_id": asset.cluster_id,
-        "dampening_factor": asset.dampening_factor,
-        "is_active": asset.is_active,
+        "symbol": asset.symbol if asset else symbol,
+        "base_currency": asset.base_currency if asset else symbol.split("-")[0],
+        "cluster_id": asset.cluster_id if asset else None,
+        "dampening_factor": asset.dampening_factor if asset else 1.0,
+        "is_active": asset.is_active if asset else True,
         **metrics
     }
 
