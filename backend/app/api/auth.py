@@ -120,24 +120,11 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         sys_access_token = create_access_token(user.id)
         sys_refresh_token = create_refresh_token(user.id)
 
-        # Return tokens (in production, typically redirect to frontend dashboard page with tokens)
-        return {
-            "success": True,
-            "data": {
-                "access_token": sys_access_token,
-                "refresh_token": sys_refresh_token,
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "display_name": user.display_name,
-                    "avatar_url": user.avatar_url,
-                    "role": user.role,
-                    "status": user.status
-                }
-            },
-            "error": None,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+        # Redirect to frontend login page with tokens — LoginInner reads them from query params
+        from urllib.parse import urlencode
+        frontend_url = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "https://zf.nexacore.my.id"
+        params = urlencode({"access_token": sys_access_token, "refresh_token": sys_refresh_token})
+        return RedirectResponse(f"{frontend_url}/login?{params}")
 
 @router.post("/refresh")
 async def refresh_token(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
