@@ -15,6 +15,7 @@ from sqlalchemy import select, text
 from app.api import admin, api_keys, assets, auth, calibration, demo, predictions, system, websocket
 from app.config import settings
 from app.database import async_session_maker
+from app.models.asset import AssetRegistry
 from app.models.user import User
 
 logger = structlog.get_logger()
@@ -79,18 +80,14 @@ async def lifespan(app: FastAPI):
 
     # Start OKX WebSocket data ingestion
     from app.ingestion.okx_ws import OKXWebSocketClient
-    from app.core.asset_swarm import AssetSwarmManager
 
     okx_client = OKXWebSocketClient()
 
     async def start_ingestion():
         """Load active symbols from DB (or use defaults) and start OKX WS."""
         try:
-            swarm = AssetSwarmManager()
             async with async_session_maker() as db:
-                from app.models import AssetRegistry
-                from sqlalchemy import select as sa_select
-                res = await db.execute(sa_select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
+                res = await db.execute(select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
                 symbols = [r[0] for r in res.all()]
 
             if not symbols:
