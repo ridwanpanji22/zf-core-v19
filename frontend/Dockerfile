@@ -3,8 +3,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
-# Debug: verify tsconfig and src/lib exist in build context
-RUN cat tsconfig.json | head -25 && ls -la src/lib/
 RUN npm run build
 
 FROM node:20-alpine AS runner
