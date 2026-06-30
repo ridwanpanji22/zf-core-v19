@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getAccessToken } from "./auth";
 import type { WSMessage } from "./types";
 
@@ -13,9 +13,14 @@ class WSManager {
   private reconnectDelay = 1000;
   private maxReconnectDelay = 30000;
   private url: string | null = null;
+  private failures = 0;
+  private maxFailures = 3; // Stop retrying after 3 consecutive failures
 
   connect(baseUrl?: string) {
     if (this.ws?.readyState === WebSocket.OPEN) return;
+    // ponytail: stop retrying when WS proxy is broken (OLS limitation)
+    // upgrade path: switch to Nginx or expose WS on separate port
+    if (this.failures >= this.maxFailures) return;
 
     const token = getAccessToken();
     if (!token) return;
@@ -29,6 +34,7 @@ class WSManager {
 
       this.ws.onopen = () => {
         this.reconnectDelay = 1000;
+        this.failures = 0;
       };
 
       this.ws.onmessage = (event) => {
@@ -44,6 +50,7 @@ class WSManager {
       };
 
       this.ws.onclose = () => {
+        this.failures++;
         this.scheduleReconnect();
       };
 
@@ -51,12 +58,13 @@ class WSManager {
         this.ws?.close();
       };
     } catch {
+      this.failures++;
       this.scheduleReconnect();
     }
   }
 
   private scheduleReconnect() {
-    if (this.reconnectTimer) return;
+    if (this.reconnectTimer || this.failures >= this.maxFailures) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
