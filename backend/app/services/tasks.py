@@ -28,10 +28,15 @@ swarm_manager = AssetSwarmManager()
 
 def async_task(f):
     """Decorator to run async functions inside Celery sync tasks.
-    Uses asyncio.run() which properly creates + closes event loop per invocation.
+    Creates a fresh event loop per invocation to avoid 'attached to a different loop'
+    errors in prefork workers.
     """
     def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(f(*args, **kwargs))
+        finally:
+            loop.close()
     return wrapper
 
 def check_vps_memory() -> bool:

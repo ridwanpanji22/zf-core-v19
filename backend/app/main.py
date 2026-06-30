@@ -72,13 +72,50 @@ async def lifespan(app: FastAPI):
 
     await seed_super_admin()
 
+    # Start Redis pub/sub listener for WebSocket broadcast
     task = asyncio.create_task(websocket.redis_listener())
     bg_tasks.add(task)
     task.add_done_callback(bg_tasks.discard)
 
+    # Start OKX WebSocket data ingestion
+    from app.ingestion.okx_ws import OKXWebSocketClient
+    from app.core.asset_swarm import AssetSwarmManager
+
+    okx_client = OKXWebSocketClient()
+
+    async def start_ingestion():
+        """Load active symbols from DB (or use defaults) and start OKX WS."""
+        try:
+            swarm = AssetSwarmManager()
+            async with async_session_maker() as db:
+                from app.models import AssetRegistry
+                from sqlalchemy import select as sa_select
+                res = await db.execute(sa_select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
+                symbols = [r[0] for r in res.all()]
+
+            if not symbols:
+                # No assets in DB yet — use top perpetuals as bootstrap
+                symbols = [
+                    "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP",
+                    "XRP-USDT-SWAP", "DOGE-USDT-SWAP", "ADA-USDT-SWAP",
+                    "AVAX-USDT-SWAP", "DOT-USDT-SWAP", "LINK-USDT-SWAP",
+                    "MATIC-USDT-SWAP",
+                ]
+                logger.info("No assets in registry, using bootstrap symbols", count=len(symbols))
+
+            await okx_client.start(symbols)
+            logger.info("OKX WebSocket ingestion started", symbols=len(symbols))
+        except Exception as e:
+            logger.error("Failed to start OKX ingestion — dashboard will show stale data", error=str(e))
+
+    ingestion_task = asyncio.create_task(start_ingestion())
+    bg_tasks.add(ingestion_task)
+    ingestion_task.add_done_callback(bg_tasks.discard)
+
     yield
 
     logger.info("ZF-Core graceful shutdown")
+    await okx_client.stop()
     for t in bg_tasks:
         t.cancel()
 
