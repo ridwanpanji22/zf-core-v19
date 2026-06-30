@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     DEMO_MAX_LEVERAGE: int = 10
     CORS_ORIGINS: list[str] = ["http://localhost:3000"] # Override in .env for production
 
+    # Bootstrap symbols used when asset_registry is empty
+    BOOTSTRAP_SYMBOLS: list[str] = [
+        "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP",
+        "XRP-USDT-SWAP", "DOGE-USDT-SWAP", "ADA-USDT-SWAP",
+        "AVAX-USDT-SWAP", "DOT-USDT-SWAP", "LINK-USDT-SWAP",
+        "POL-USDT-SWAP",
+    ]
+
     @property
     def database_url(self) -> str:
         return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"

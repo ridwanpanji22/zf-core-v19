@@ -23,6 +23,9 @@ async def list_assets(
     res = await db.execute(select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
     symbols = [r[0] for r in res.all()]
 
+    if not symbols:
+        symbols = settings.BOOTSTRAP_SYMBOLS
+
     assets = []
     for symbol in symbols:
         val = await redis_client.get(f"metrics:{symbol}")

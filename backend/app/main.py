@@ -91,13 +91,7 @@ async def lifespan(app: FastAPI):
                 symbols = [r[0] for r in res.all()]
 
             if not symbols:
-                # No assets in DB yet — use top perpetuals as bootstrap
-                symbols = [
-                    "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP",
-                    "XRP-USDT-SWAP", "DOGE-USDT-SWAP", "ADA-USDT-SWAP",
-                    "AVAX-USDT-SWAP", "DOT-USDT-SWAP", "LINK-USDT-SWAP",
-                    "MATIC-USDT-SWAP",
-                ]
+                symbols = settings.BOOTSTRAP_SYMBOLS
                 logger.info("No assets in registry, using bootstrap symbols", count=len(symbols))
 
             await okx_client.start(symbols)

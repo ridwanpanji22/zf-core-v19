@@ -104,6 +104,11 @@ async def calculate_deep_analysis():
             )
             deep_symbols = [r[0] for r in reg_res.all()]
 
+        # Fallback to bootstrap symbols when registry is empty
+        if not deep_symbols:
+            deep_symbols = settings.BOOTSTRAP_SYMBOLS
+            logger.info("No assets in registry, using bootstrap symbols for deep analysis")
+
         for symbol in deep_symbols:
             ticker_raw = redis_client.get(f"tick:{symbol}")
             book_raw = redis_client.get(f"book:{symbol}")
@@ -251,6 +256,9 @@ async def poll_oi_funding():
         )
         symbols = [r[0] for r in reg_res.all()]
 
+    if not symbols:
+        symbols = settings.BOOTSTRAP_SYMBOLS
+
     # Batch fetch — ccxt fetch_funding_rates returns all at once
     try:
         funding_rates = await asyncio.to_thread(exchange.fetch_funding_rates, symbols[:50])
@@ -280,6 +288,9 @@ async def save_mbs_snapshot():
             select(mbs.AssetRegistry.symbol).where(mbs.AssetRegistry.is_active == True)
         )
         symbols = [r[0] for r in reg_res.all()]
+
+        if not symbols:
+            symbols = settings.BOOTSTRAP_SYMBOLS
 
         assets_data = []
         for symbol in symbols:

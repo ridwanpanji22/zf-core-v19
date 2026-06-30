@@ -23,6 +23,10 @@ export default function AssetTable() {
       }
     };
     loadAssets();
+    // ponytail: poll every 10s as fallback while OLS WS proxy is broken
+    // upgrade path: remove interval once WS works (Nginx or direct port)
+    const interval = setInterval(loadAssets, 10_000);
+    return () => clearInterval(interval);
   }, []);
 
   const liveUpdate = useWebSocket<Asset>("asset_update");
@@ -135,8 +139,8 @@ export default function AssetTable() {
             {processedAssets.map((asset, index) => (
               <tr
                 key={asset.symbol}
-                onClick={() => router.push(`/dashboard/${asset.symbol}`)}
-                onKeyDown={(e) => e.key === "Enter" && router.push(`/dashboard/${asset.symbol}`)}
+                onClick={() => router.push(`/${asset.symbol}`)}
+                onKeyDown={(e) => e.key === "Enter" && router.push(`/${asset.symbol}`)}
                 tabIndex={0}
                 role="row"
                 aria-label={`${asset.symbol} — ZF-Score ${asset.zf_score.toFixed(4)}, Status ${asset.status}`}

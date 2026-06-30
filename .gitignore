@@ -48,6 +48,7 @@ yarn-error.log*
 .env.production.local
 *.env
 !.env.example
+log.md
 
 # IDE
 .vscode/
