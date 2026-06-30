@@ -77,7 +77,11 @@ async def open_position(
 
     reg_res = await db.execute(select(AssetRegistry).where(AssetRegistry.symbol == symbol))
     asset = reg_res.scalar_one_or_none()
-    if not asset or not asset.is_active:
+    if not asset:
+        # ponytail: fallback to bootstrap symbols when registry is empty (pre-00:30 UTC seed)
+        if symbol not in settings.BOOTSTRAP_SYMBOLS:
+            raise ValueError("Asset is inactive or not registered")
+    elif not asset.is_active:
         raise ValueError("Asset is inactive or not registered")
 
     val = await redis_client.get(f"metrics:{symbol}")

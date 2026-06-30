@@ -51,7 +51,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         data: null,
         error: {
           code: errorData.error?.code || "HTTP_ERROR",
-          message: errorData.error?.message || `HTTP error! Status: ${response.status}`,
+          message: errorData.error?.message || errorData.detail || `HTTP error! Status: ${response.status}`,
         },
         timestamp: new Date().toISOString(),
       };

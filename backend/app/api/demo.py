@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from redis import Redis
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +40,7 @@ async def get_wallet(
 
     unrealized_pnl = 0.0
     for pos in open_positions:
-        val = redis_client.get(f"metrics:{pos.symbol}")
+        val = await redis_client.get(f"metrics:{pos.symbol}")
         if val:
             try:
                 price = float(json.loads(val)["price"])
@@ -105,7 +105,7 @@ async def get_open_positions(
 
     data = []
     for pos in positions:
-        val = redis_client.get(f"metrics:{pos.symbol}")
+        val = await redis_client.get(f"metrics:{pos.symbol}")
         unrealized = 0.0
         mark_price = float(pos.entry_price)
         if val:
