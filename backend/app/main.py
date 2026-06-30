@@ -103,6 +103,17 @@ async def lifespan(app: FastAPI):
     bg_tasks.add(ingestion_task)
     ingestion_task.add_done_callback(bg_tasks.discard)
 
+    # Trigger asset registry refresh if empty (don't wait until 00:30 UTC)
+    try:
+        async with async_session_maker() as db:
+            count_res = await db.execute(select(AssetRegistry.symbol).limit(1))
+            if not count_res.first():
+                from app.services.celery_app import celery_app as celery
+                celery.send_task("app.services.tasks.refresh_asset_registry")
+                logger.info("Asset registry empty — triggered refresh task")
+    except Exception as e:
+        logger.error("Failed to check/trigger asset registry refresh", error=str(e))
+
     yield
 
     logger.info("ZF-Core graceful shutdown")

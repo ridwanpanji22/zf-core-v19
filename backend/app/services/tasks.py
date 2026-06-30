@@ -18,6 +18,7 @@ from app.core.zf_score import calculate_zf_score
 from app.database import async_session_maker
 from app.services import demo as demo_service
 from app.services import mbs
+from app.services.telegram import TelegramAlertSystem
 from app.services.celery_app import celery_app
 
 logger = structlog.get_logger()
@@ -163,9 +164,40 @@ async def calculate_deep_analysis():
             redis_client.set(f"metrics:{symbol}", json.dumps(metrics_payload), ex=60)
             redis_client.publish("dashboard:updates", json.dumps({"type": "asset_update", "data": metrics_payload}))
 
+            # Telegram alerts based on ZF-Score thresholds
+            telegram = TelegramAlertSystem()
+            try:
+                if zf_result.score >= 0.85:
+                    await telegram.trigger_alert(
+                        priority="critical",
+                        alert_type="code_red",
+                        message=f"CODE RED: {symbol}\nZF-Score: {zf_result.score:.4f}\nHarga: ${p_market:,.2f}\nΨ_total: {psi:.4f}\nD_res: {d_res:.2f}%",
+                        symbol=symbol
+                    )
+                elif zf_result.score >= 0.80:
+                    await telegram.trigger_alert(
+                        priority="warning",
+                        alert_type="waspada",
+                        message=f"WASPADA: {symbol}\nZF-Score: {zf_result.score:.4f}\nHarga: ${p_market:,.2f}\nΨ_total: {psi:.4f}",
+                        symbol=symbol
+                    )
+            finally:
+                await telegram.close()
+
             # Circuit Breaker trigger (ZF-Score >= 0.99)
             if zf_result.score >= 0.99:
                 redis_client.set("system:circuit_breaker", "true")
+                # Send critical Telegram alert for circuit breaker
+                tg = TelegramAlertSystem()
+                try:
+                    await tg.trigger_alert(
+                        priority="critical",
+                        alert_type="circuit_breaker",
+                        message=f"CIRCUIT BREAKER AKTIF!\n{symbol} ZF-Score: {zf_result.score:.4f}\nSemua eksekusi dihentikan.",
+                        symbol=symbol
+                    )
+                finally:
+                    await tg.close()
                 event = mbs.SystemEvent(
                     time=datetime.now(timezone.utc),
                     event_type="circuit_breaker",
@@ -311,6 +343,9 @@ async def calculate_decay_prediction():
             select(mbs.AssetRegistry.symbol).where(mbs.AssetRegistry.is_active == True)
         )
         symbols = [r[0] for r in reg_res.all()]
+
+        if not symbols:
+            symbols = settings.BOOTSTRAP_SYMBOLS
 
         for symbol in symbols:
             time_limit = datetime.now(timezone.utc) - timedelta(days=30)

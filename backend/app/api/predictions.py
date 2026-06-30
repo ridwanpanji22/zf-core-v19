@@ -24,6 +24,9 @@ async def get_top20_predictions(
     res = await db.execute(select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
     symbols = [r[0] for r in res.all()]
 
+    if not symbols:
+        symbols = settings.BOOTSTRAP_SYMBOLS
+
     assets = []
     up_count = 0
     down_count = 0
@@ -98,6 +101,9 @@ async def get_market_dominance(
     """Calculate percentage share of market directions."""
     res = await db.execute(select(AssetRegistry.symbol).where(AssetRegistry.is_active == True))
     symbols = [r[0] for r in res.all()]
+
+    if not symbols:
+        symbols = settings.BOOTSTRAP_SYMBOLS
 
     up_count = 0
     down_count = 0
