@@ -14,9 +14,9 @@ class WSManager {
   private maxReconnectDelay = 30000;
   private url: string | null = null;
   private failures = 0;
-  private maxFailures = 3; // Stop retrying after 3 consecutive failures
+  private maxFailures = 10; // Allow more retries now that WS proxy is via Nginx
 
-  connect(baseUrl?: string) {
+  connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
     // ponytail: stop retrying when WS proxy is broken (OLS limitation)
     // upgrade path: switch to Nginx or expose WS on separate port
@@ -25,9 +25,14 @@ class WSManager {
     const token = getAccessToken();
     if (!token) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = baseUrl || window.location.host;
-    this.url = `${protocol}//${host}/ws/dashboard?token=${token}`;
+    // Use dedicated WS endpoint if configured, otherwise fallback to same host
+    const wsBase = process.env.NEXT_PUBLIC_WS_URL;
+    if (wsBase) {
+      this.url = `${wsBase}/ws/dashboard?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      this.url = `${protocol}//${window.location.host}/ws/dashboard?token=${token}`;
+    }
 
     try {
       this.ws = new WebSocket(this.url);

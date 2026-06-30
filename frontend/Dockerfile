@@ -1,5 +1,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Build-time env vars for Next.js (NEXT_PUBLIC_* must be present at build)
+ARG NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .

@@ -91,6 +91,23 @@ services:
         reservations:
           memory: 128M
 
+  ws-proxy:
+    build: ./ws-proxy
+    ports:
+      - "0.0.0.0:8443:8443" # Public — Cloudflare proxied via ws.zf.nexacore.my.id
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [frontend]
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.25'
+        reservations:
+          memory: 16M
+
   db:
     image: timescale/timescaledb:2.17.2-pg16
     volumes:
