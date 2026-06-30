@@ -229,24 +229,9 @@ def upgrade() -> None:
     op.execute("SELECT add_retention_policy('prediction_log', INTERVAL '90 days');")
     op.execute("SELECT add_retention_policy('system_events', INTERVAL '90 days');")
 
-    # 3. Create daily continuous aggregate view
-    op.execute("""
-        CREATE MATERIALIZED VIEW asset_daily_aggregates
-        WITH (timescaledb.continuous) AS
-        SELECT
-            time_bucket('1 day', time) AS day,
-            symbol,
-            AVG(zf_score) AS avg_zf_score,
-            MAX(zf_score) AS max_zf_score,
-            AVG(psi_total) AS avg_psi_total,
-            FIRST(price, time) AS open_price,
-            LAST(price, time) AS close_price,
-            MAX(price) AS high_price,
-            MIN(price) AS low_price,
-            AVG(volume_24h) AS avg_volume
-        FROM asset_snapshots
-        GROUP BY day, symbol;
-    """)
+    # 3. Continuous aggregates are created in a separate migration (002)
+    #    because TimescaleDB requires CREATE MATERIALIZED VIEW ... WITH DATA
+    #    to run outside a transaction block.
 
     # 4. Insert default system configuration settings
     op.execute("INSERT INTO system_config (key, value) VALUES ('demo_mode_enabled', '\"true\"'::jsonb);")
@@ -255,8 +240,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop daily aggregates view
-    op.execute("DROP MATERIALIZED VIEW IF EXISTS asset_daily_aggregates;")
+    # Continuous aggregate dropped in 002_continuous_aggregates downgrade
 
     op.drop_table('system_config')
     op.drop_table('demo_positions')
