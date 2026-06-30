@@ -21,7 +21,7 @@ export default function Sidebar() {
     },
     {
       name: "Settings",
-      path: "/dashboard/settings",
+      path: "/settings",
       icon: Settings,
     },
   ];
