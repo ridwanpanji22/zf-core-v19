@@ -18,8 +18,8 @@ from app.core.zf_score import calculate_zf_score
 from app.database import async_session_maker
 from app.services import demo as demo_service
 from app.services import mbs
-from app.services.telegram import TelegramAlertSystem
 from app.services.celery_app import celery_app
+from app.services.telegram import TelegramAlertSystem
 
 logger = structlog.get_logger()
 # ponytail: Celery workers run sync — sync Redis OK here. Upgrade to redis.asyncio
