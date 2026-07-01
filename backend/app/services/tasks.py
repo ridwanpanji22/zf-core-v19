@@ -455,14 +455,23 @@ async def refresh_asset_registry():
     exchange = ccxtpro.okx()
     try:
         symbols = await swarm_manager.refresh_registry(exchange)
+        logger.info("Registry refresh fetched symbols", count=len(symbols))
         async with get_celery_db() as db:
             for symbol in symbols:
                 base = symbol.split("-")[0]
-                await db.merge(mbs.AssetRegistry(
-                    symbol=symbol,
-                    base_currency=base,
-                    is_active=True
-                ))
+                # Upsert: check if exists, then insert or update
+                existing = await db.execute(
+                    select(mbs.AssetRegistry).where(mbs.AssetRegistry.symbol == symbol)
+                )
+                asset = existing.scalar_one_or_none()
+                if asset:
+                    asset.is_active = True
+                else:
+                    db.add(mbs.AssetRegistry(
+                        symbol=symbol,
+                        base_currency=base,
+                        is_active=True,
+                    ))
             await db.commit()
     finally:
         await exchange.close()

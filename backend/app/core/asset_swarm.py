@@ -36,7 +36,12 @@ class AssetSwarmManager:
                 reverse=True
             )
 
-            top_symbols = [t["symbol"] for t in sorted_tickers[:200]]
+            top_symbols = []
+            for t in sorted_tickers[:200]:
+                # Convert ccxt unified format (BTC/USDT:USDT) → OKX native (BTC-USDT-SWAP)
+                sym = t["symbol"]
+                base = sym.split("/")[0]
+                top_symbols.append(f"{base}-USDT-SWAP")
             logger.info("Top symbols fetched", count=len(top_symbols))
             return top_symbols
         except Exception as e:
