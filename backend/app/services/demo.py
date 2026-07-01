@@ -12,7 +12,10 @@ from app.models.asset import AssetRegistry
 from app.models.demo import DemoPosition, DemoWallet
 
 logger = structlog.get_logger()
-redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+# ponytail: create fresh Redis per call to avoid 'Event loop is closed' in Celery.
+# Upgrade to a shared pool when migrating to async-native task runner (dramatiq/taskiq).
+def _redis() -> Redis:
+    return Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 async def get_or_create_wallet(db: AsyncSession, user_id: int) -> DemoWallet:
     """Get active demo wallet for user, auto-create if not exists."""
@@ -84,7 +87,7 @@ async def open_position(
     elif not asset.is_active:
         raise ValueError("Asset is inactive or not registered")
 
-    val = await redis_client.get(f"metrics:{symbol}")
+    val = await _redis().get(f"metrics:{symbol}")
     if not val:
         raise ValueError(f"No real-time market data available for {symbol}")
 
@@ -131,7 +134,7 @@ async def close_position(db: AsyncSession, user_id: int, position_id: int, reaso
     if not pos:
         raise ValueError("Position not found or already closed")
 
-    val = await redis_client.get(f"metrics:{pos.symbol}")
+    val = await _redis().get(f"metrics:{pos.symbol}")
     price = pos.entry_price # fallback
     if val:
         try:
@@ -179,7 +182,7 @@ async def check_liquidations(db: AsyncSession):
     positions = res.scalars().all()
 
     for pos in positions:
-        val = await redis_client.get(f"metrics:{pos.symbol}")
+        val = await _redis().get(f"metrics:{pos.symbol}")
         if not val:
             continue
         try:
