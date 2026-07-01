@@ -15,7 +15,7 @@ from app.core.decay import predict_decay
 from app.core.drift import calculate_drift, calculate_vwap
 from app.core.psi_total import calculate_psi_total
 from app.core.zf_score import calculate_zf_score
-from app.database import async_session_maker
+from app.database import get_celery_db
 from app.services import demo as demo_service
 from app.services import mbs
 from app.services.celery_app import celery_app
@@ -95,7 +95,7 @@ async def calculate_deep_analysis():
         logger.warn("System forced into heartbeat mode globally due to low memory footprint")
         return False
 
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         classification = await swarm_manager.classify_assets(db)
         deep_symbols = classification.get("deep_analysis", [])
 
@@ -222,7 +222,7 @@ async def calculate_heartbeat():
         redis_client.set("system:low_memory_mode", "false")
         logger.info("VPS RAM recovered. Restoring normal deep analysis tracking.")
 
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         classification = await swarm_manager.classify_assets(db)
         heartbeat_symbols = classification.get("heartbeat", [])
 
@@ -282,7 +282,7 @@ async def poll_oi_funding():
     import ccxt
     exchange = ccxt.okx({"enableRateLimit": True})
 
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         reg_res = await db.execute(
             select(mbs.AssetRegistry.symbol).where(mbs.AssetRegistry.is_active == True)
         )
@@ -315,7 +315,7 @@ async def poll_oi_funding():
 @async_task
 async def save_mbs_snapshot():
     logger.info("Executing save_mbs_snapshot")
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         reg_res = await db.execute(
             select(mbs.AssetRegistry.symbol).where(mbs.AssetRegistry.is_active == True)
         )
@@ -338,7 +338,7 @@ async def save_mbs_snapshot():
 @async_task
 async def calculate_decay_prediction():
     logger.info("Executing calculate_decay_prediction")
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         reg_res = await db.execute(
             select(mbs.AssetRegistry.symbol).where(mbs.AssetRegistry.is_active == True)
         )
@@ -387,7 +387,7 @@ async def calculate_decay_prediction():
 @async_task
 async def recalculate_clusters():
     logger.info("Executing recalculate_clusters")
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         await swarm_manager.recalculate_clusters(db)
     return True
 
@@ -396,7 +396,7 @@ async def recalculate_clusters():
 async def recalibrate_omega():
     """Recalibrate omega weights using actual prediction vs realized data."""
     logger.info("Executing recalibrate_omega")
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         # Get current omega weights
         cal_res = await db.execute(
             select(mbs.CalibrationLog)
@@ -455,7 +455,7 @@ async def refresh_asset_registry():
     exchange = ccxtpro.okx()
     try:
         symbols = await swarm_manager.refresh_registry(exchange)
-        async with async_session_maker() as db:
+        async with get_celery_db() as db:
             for symbol in symbols:
                 base = symbol.split("-")[0]
                 await db.merge(mbs.AssetRegistry(
@@ -499,6 +499,6 @@ def backup_database():
 @async_task
 async def check_demo_liquidations():
     logger.info("Executing check_demo_liquidations")
-    async with async_session_maker() as db:
+    async with get_celery_db() as db:
         await demo_service.check_liquidations(db)
     return True

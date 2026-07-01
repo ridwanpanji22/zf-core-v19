@@ -39,6 +39,7 @@ class OKXWebSocketClient:
             })
 
         self.exchange = ccxtpro.okx(exchange_config)
+        await self.exchange.load_markets()
 
         # Spawn tasks for concurrent listening
         for symbol in symbols:
