@@ -173,29 +173,47 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: GHCR_TOKEN
           script: |
-            set -e
+            set -eo pipefail
             cd /home/ridwan/zf-core-v19
 
             # Ensure backup directory exists
             mkdir -p /home/ridwan/backups
 
-            # Backup DB before deploy (CLAUDE.md mandate) — skip on first deploy
-            if docker compose ps db --status running -q 2>/dev/null | grep -q .; then
-              docker compose exec -T db pg_dump -U zfcore zfcore | gzip > /home/ridwan/backups/zfcore_$(date +%Y%m%d_%H%M%S).sql.gz
-              if [ $? -ne 0 ]; then
+            # Backup DB before deploy (CLAUDE.md mandate) — skip on first deploy.
+            # Require db to be healthy (not merely running) so pg_dump doesn't run
+            # against a still-starting container and silently produce an empty dump.
+            if docker compose ps db --status healthy -q 2>/dev/null | grep -q .; then
+              BACKUP_FILE=/home/ridwan/backups/zfcore_$(date +%Y%m%d_%H%M%S).sql.gz
+              if ! docker compose exec -T db pg_dump -U zfcore zfcore | gzip > "$BACKUP_FILE"; then
                 echo "❌ DB backup failed — aborting deploy"
+                rm -f "$BACKUP_FILE"
                 exit 1
               fi
-              echo "✅ DB backup completed"
+              # pipefail catches a failed pg_dump, but guard against a zero-byte
+              # dump as a second line of defense (e.g. pg_dump printed nothing).
+              if [ ! -s "$BACKUP_FILE" ]; then
+                echo "❌ DB backup produced an empty file — aborting deploy"
+                rm -f "$BACKUP_FILE"
+                exit 1
+              fi
+              echo "✅ DB backup completed ($(stat -c%s "$BACKUP_FILE") bytes)"
             else
-              echo "⏭️ No running DB container — skipping backup (first deploy)"
+              echo "⏭️ No healthy DB container — skipping backup (first deploy)"
             fi
 
             # Login to GHCR
             echo "$GHCR_TOKEN" | docker login ghcr.io -u ridwanpanji22 --password-stdin
 
             git pull origin main
+
+            # Pull CoreDNS DoT sidecar explicitly first
+            # (Docker Hub public, no auth — must be available before backend/celery
+            #  which depend on dns: service_started)
+            docker compose pull dns
+
+            # Pull all remaining images (GHCR backend/frontend + Docker Hub db/redis/coredns)
             docker compose pull
+
             docker compose up -d --remove-orphans
 
             # Wait for DB to be healthy before migration

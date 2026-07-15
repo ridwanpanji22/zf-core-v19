@@ -1,0 +1,15 @@
+# CoreDNS config — DNS-over-TLS forwarder to Cloudflare.
+# Bypasses ISP/Kominfo UDP/53 DNS hijack on the VPS (Hostinger Jakarta).
+# DoT (TCP/853) to 1.1.1.1 is NOT hijacked (verified 2026-07-15).
+.:53 {
+    errors
+    health :8080
+    forward . tls://1.1.1.1:853 tls://1.0.0.1:853 {
+        tls
+        tls_servername cloudflare-dns.com
+        expire 10s
+    }
+    cache 30
+    loop
+    reload
+}
