@@ -29,10 +29,23 @@ class AssetSwarmManager:
             # Fetch tickers to sort by volume
             tickers = await exchange.fetch_tickers([m["symbol"] for m in swap_markets])
 
-            # Sort by 24h quote volume (USDT volume) descending
+            # Sort by 24h quote volume (USDT volume) descending.
+            # OKX does not populate ccxt's `quoteVolume` field on its tickers
+            # (verified 2026-07-15: quoteVolume is None for all OKX perpetuals),
+            # so derive it as baseVolume * last when quoteVolume is missing.
+            # Falling back to 0 keeps ordering stable without dropping assets
+            # that simply have no volume yet.
+            def quote_volume(t):
+                qv = t.get("quoteVolume")
+                if qv is not None:
+                    return qv
+                base = t.get("baseVolume") or 0
+                last = t.get("last") or 0
+                return base * last
+
             sorted_tickers = sorted(
-                [t for t in tickers.values() if t.get("quoteVolume") is not None],
-                key=lambda x: x["quoteVolume"],
+                [t for t in tickers.values() if quote_volume(t) > 0],
+                key=quote_volume,
                 reverse=True
             )
 
