@@ -205,7 +205,15 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u ridwanpanji22 --password-stdin
 
             git pull origin main
+
+            # Pull CoreDNS DoT sidecar explicitly first
+            # (Docker Hub public, no auth — must be available before backend/celery
+            #  which depend on dns: service_started)
+            docker compose pull dns
+
+            # Pull all remaining images (GHCR backend/frontend + Docker Hub db/redis/coredns)
             docker compose pull
+
             docker compose up -d --remove-orphans
 
             # Wait for DB to be healthy before migration

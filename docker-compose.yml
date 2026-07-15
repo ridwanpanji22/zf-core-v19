@@ -5,13 +5,14 @@ services:
     ports:
       - "127.0.0.1:8000:8000" # Internal only — reverse proxy via OpenLiteSpeed
     dns:
-      - 1.1.1.1
-      - 8.8.8.8
+      - 172.30.0.53 # CoreDNS DoT sidecar (bypasses ISP/Kominfo UDP/53 hijack)
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      dns:
+        condition: service_started
     env_file:
       - .env
     restart: unless-stopped
@@ -34,13 +35,14 @@ services:
     build: ./backend
     command: celery -A app.services.celery_app worker --loglevel=info --pool=prefork --concurrency=2
     dns:
-      - 1.1.1.1
-      - 8.8.8.8
+      - 172.30.0.53 # CoreDNS DoT sidecar (bypasses UDP/53 hijack)
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      dns:
+        condition: service_started
     env_file:
       - .env
     restart: unless-stopped
@@ -57,11 +59,15 @@ services:
     image: ghcr.io/ridwanpanji22/zf-core-v19/backend:latest
     build: ./backend
     command: celery -A app.services.celery_app beat --loglevel=info
+    dns:
+      - 172.30.0.53 # CoreDNS DoT sidecar
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      dns:
+        condition: service_started
     env_file:
       - .env
     restart: unless-stopped
@@ -109,6 +115,33 @@ services:
           cpus: '0.25'
         reservations:
           memory: 16M
+
+  # DNS-over-TLS sidecar — bypasses ISP/Kominfo DNS hijack on UDP/53.
+  # DoT (TCP/853 to 1.1.1.1:853 with SNI cloudflare-dns.com) is NOT hijacked
+  # (verified 2026-07-15); plain UDP/53 to 1.1.1.1 IS hijacked → resolves
+  # exchange domains to Kominfo block IPs (139.255.196.196 / lamanlabuh.aduankonten.id).
+  # cloudflared proxy-dns was removed in cloudflared 2026.2.0, so we use CoreDNS
+  # with the `forward` plugin over TLS. Empirically verified end-to-end:
+  # www.okx.com → 104.18.43.174 / 172.64.144.82 (real Cloudflare, not block IP).
+  # Static IP so `dns:` directives below can reference it deterministically.
+  dns:
+    image: coredns/coredns:latest
+    volumes:
+      - ./dns/Corefile:/Corefile:ro
+    restart: unless-stopped
+    networks:
+      backend:
+        ipv4_address: 172.30.0.53
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.25'
+        reservations:
+          memory: 16M
+    # CoreDNS official image is distroless (no shell/wget/curl), so no CMD
+    # healthcheck is possible. CoreDNS starts in ~1s and is very stable;
+    # dependents use condition: service_started (see backend/celery-*).
 
   db:
     image: timescale/timescaledb:2.17.2-pg16
@@ -160,7 +193,10 @@ services:
 
 networks:
   frontend:   # frontend <-> backend only
-  backend:    # backend <-> celery <-> data
+  backend:    # backend <-> celery <-> data + cloudflared DoT sidecar
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
   data:       # db + redis (internal only)
 
 volumes:
