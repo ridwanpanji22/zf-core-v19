@@ -5,7 +5,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetRegistry, AssetSnapshot
-from app.models.prediction import CalibrationLog
+from app.models.prediction import CalibrationLog, PredictionLog
 from app.models.session import SessionJournal
 
 logger = structlog.get_logger()
